@@ -71,3 +71,17 @@ figure { margin: 0; }
   body { font-size: 16.5px; }
   h2 { font-size: 1.55rem; }
 }
+
+/* Keyboard key, e.g. <kbd>→</kbd> */
+kbd {
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: .8em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
+/* Code inside the table of contents keeps the link colour */
+.toc code { font-size: .92em; padding: 0 4px; }

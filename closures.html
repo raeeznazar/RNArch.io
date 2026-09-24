@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JavaScript Closures · PrepStack</title>
+    <meta
+      name="description"
+      content="JavaScript closures for interviews: what they are, how a function keeps its outer variables alive, private state, setTimeout, the var-in-a-loop trap and stale closures in React Native, with a step-by-step visualizer."
+    />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+
+    <!-- Styles (css/main.css imports everything else) -->
+    <link rel="stylesheet" href="css/main.css" />
+
+    <!-- Shared site scripts -->
+    <script src="js/theme.js"></script>
+    <script src="js/sidebar.js" defer></script>
+    <script src="js/copy-code.js" defer></script>
+
+    <!-- This page reuses the execution-context visualizer and quiz with its own data.
+         Order matters: helpers → data → features -->
+    <script src="js/execution-context/highlight.js" defer></script>
+    <script src="js/closures/examples.js" defer></script>
+    <script src="js/closures/quiz-questions.js" defer></script>
+    <script src="js/execution-context/visualizer.js" defer></script>
+    <script src="js/execution-context/quiz.js" defer></script>
+    <script src="js/closures/playgrounds.js" defer></script>
+  </head>
+  <body>
+    <div class="layout">
+      <!-- ============ SIDEBAR ============ -->
+      <aside class="sidebar" aria-label="Table of contents">
+        <div class="sidebar__brand">
+          <span class="sidebar__logo">⚛</span>
+          <span class="sidebar__name">
+            PrepStack
+            <small class="sidebar__tagline">Attend interviews confidently</small>
+          </span>
+          <button class="sidebar__menu-btn" type="button" aria-expanded="false">
+            Contents
+          </button>
+        </div>
+
+        <nav class="sidebar__nav">
+          <!-- Topics: keep this list identical on every page -->
+          <p class="sidebar__label">Topics</p>
+          <ul class="topics">
+            <li><a href="index.html"><span class="topics__icon">⚛</span>React Native Architecture</a></li>
+            <li><a href="execution-context.html"><span class="topics__icon">JS</span>JavaScript Execution Context</a></li>
+            <li><a href="closures.html" aria-current="page"><span class="topics__icon">JS</span>JavaScript Closures</a></li>
+            <li><a href="threads.html"><span class="topics__icon">JS</span>Threads &amp; Event Loop</a></li>
+            <li><a href="token-refresh.html"><span class="topics__icon">🔑</span>Axios Token Refresh</a></li>
+            <li><a href="ssl-security.html"><span class="topics__icon">🔒</span>SSL/TLS &amp; App Security</a></li>
+          </ul>
+
+          <p class="sidebar__label">On this page</p>
+          <ol class="toc">
+            <li><a href="#warm-up">Warm-up puzzle</a></li>
+            <li><a href="#what-is">What is a closure?</a></li>
+            <li><a href="#visualizer">Watch a closure form</a></li>
+            <li><a href="#own-closure">Each call gets its own</a></li>
+            <li><a href="#private">Private variables</a></li>
+            <li><a href="#timers">Closures and timers</a></li>
+            <li><a href="#react-native">In React Native</a></li>
+            <li><a href="#stale">Stale closures</a></li>
+            <li><a href="#predict">Predict the output</a></li>
+            <li><a href="#interview">Interview answer</a></li>
+            <li><a href="#quiz-section">Check yourself</a></li>
+          </ol>
+          <button class="theme-toggle" type="button" data-theme-toggle>
+            ◐ Toggle theme
+          </button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <!-- ============ HERO ============ -->
+        <header class="hero">
+          <span class="hero__eyebrow">Interview essentials</span>
+          <h1 class="hero__title">JavaScript Closures</h1>
+          <p class="hero__lede">
+            A closure is created when a function remembers and can access
+            variables from its outer lexical scope, even after the outer
+            function has finished executing. It's one of the most asked
+            JavaScript interview topics, and it's behind every event handler
+            and hook you write in React Native.
+          </p>
+          <div class="chips">
+            <span class="chip">~18 min</span>
+            <span class="chip">Step-by-step visualizer</span>
+            <span class="chip">Live playgrounds</span>
+            <span class="chip">7-question quiz</span>
+          </div>
+        </header>
+
+        <!-- ============ 01 · WARM-UP PUZZLE ============ -->
+        <section class="section" id="warm-up">
+          <div class="section__num">01</div>
+          <h2>Warm-up puzzle</h2>
+          <p>The classic closure interview question. Pick an answer.</p>
+
+          <div class="puzzle" id="puzzle">
+            <div class="code-block">
+              <div class="code-block__head"><span>puzzle.js</span></div>
+              <pre><code><span class="tok-keyword">for</span> (<span class="tok-keyword">var</span> i = <span class="tok-type">0</span>; i &lt; <span class="tok-type">3</span>; i++) {
+  <span class="tok-fn">setTimeout</span>(() =&gt; <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(i), <span class="tok-type">100</span>);
+}</code></pre>
+            </div>
+            <div class="puzzle__question">What gets printed?</div>
+            <div class="puzzle__choices">
+              <button class="btn" type="button" data-answer="012">0 1 2</button>
+              <button class="btn" type="button" data-answer="333">3 3 3</button>
+              <button class="btn" type="button" data-answer="undefined">undefined ×3</button>
+            </div>
+            <p class="puzzle__feedback" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <!-- ============ 02 · WHAT IS A CLOSURE ============ -->
+        <section class="section" id="what-is">
+          <div class="section__num">02</div>
+          <h2>What is a closure?</h2>
+          <p>Start with the simplest example:</p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>counter.js</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">function</span> <span class="tok-fn">outer</span>() {
+  <span class="tok-keyword">let</span> count = <span class="tok-type">0</span>;
+
+  <span class="tok-keyword">function</span> <span class="tok-fn">inner</span>() {
+    count++;
+    <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(count);
+  }
+
+  <span class="tok-keyword">return</span> inner;
+}
+
+<span class="tok-keyword">const</span> counter = <span class="tok-fn">outer</span>();
+
+<span class="tok-fn">counter</span>(); <span class="tok-comment">// 1</span>
+<span class="tok-fn">counter</span>(); <span class="tok-comment">// 2</span>
+<span class="tok-fn">counter</span>(); <span class="tok-comment">// 3</span></code></pre>
+          </div>
+
+          <p>
+            When <code>const counter = outer();</code> runs, <code>outer()</code>
+            finishes executing. You might expect its local variable
+            <code>count</code> to be destroyed. That's not what happens:
+          </p>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--old">What you might expect</span>
+                <div class="node node--js">outer() runs<small>count = 0</small></div>
+                <div class="arrow"></div>
+                <div class="node">outer() returns</div>
+                <div class="arrow"></div>
+                <div class="node node--old">count is destroyed<small>counter() would fail</small></div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--new">What actually happens</span>
+                <div class="node node--js">outer() runs<small>count = 0, inner is created</small></div>
+                <div class="arrow"></div>
+                <div class="node">outer() returns inner</div>
+                <div class="arrow"></div>
+                <div class="node node--new">count is kept alive<small>because inner still references it</small></div>
+              </div>
+            </div>
+          </figure>
+
+          <p>
+            Because <code>inner()</code> still references <code>count</code>,
+            JavaScript keeps that lexical environment available. Every call to
+            <code>counter()</code> reaches the same <code>count</code>, so it
+            prints 1, 2, 3. We say <code>inner</code> has
+            <strong>closed over</strong> <code>count</code>.
+          </p>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">🎒</div>
+            <div>
+              <p class="callout__title">Why is it called a closure?</p>
+              <p>
+                Think of the function as carrying a backpack. When
+                <code>inner</code> is created, it packs a link to the variables
+                around it (<code>count</code>) and takes that backpack wherever
+                it goes, even after <code>outer</code> is long gone. The
+                function plus its backpack is the closure.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout callout--warn">
+            <div class="callout__icon">⚠️</div>
+            <div>
+              <p class="callout__title">It's a live link, not a copy</p>
+              <p>
+                A closure doesn't save the <em>value</em> of
+                <code>count</code>. It keeps the <em>variable</em> itself. If
+                the variable changes, the function sees the new value. This one
+                detail explains the warm-up puzzle and stale closures in React.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 03 · VISUALIZER ============ -->
+        <section class="section" id="visualizer">
+          <div class="section__num">03</div>
+          <h2>Watch a closure form</h2>
+          <p>
+            Pick a program, then press <strong>Next</strong> (or use your
+            <kbd>←</kbd> <kbd>→</kbd> arrow keys). Watch the purple dashed box:
+            that's the closure, surviving off the call stack after its function
+            has returned. New to call stacks? Read
+            <a href="execution-context.html">JavaScript Execution Context</a> first.
+          </p>
+
+          <!-- Filled by js/execution-context/visualizer.js from js/closures/examples.js -->
+          <div class="viz-tabs" id="vizTabs" role="tablist"></div>
+
+          <div class="viz">
+            <div class="viz__narration">
+              <div aria-live="polite">
+                <span class="phase-tag" id="vizPhase">Creation phase</span>
+                <h3 class="viz__title" id="vizTitle"></h3>
+                <p class="viz__text" id="vizText"></p>
+              </div>
+              <div class="viz__controls">
+                <button class="btn" type="button" id="vizRestart">Restart</button>
+                <button class="btn" type="button" id="vizPrev">Back</button>
+                <button class="btn btn--primary" type="button" id="vizNext">Next</button>
+                <button class="btn" type="button" id="vizPlay">Play</button>
+              </div>
+            </div>
+            <div class="viz__count" id="vizCount"></div>
+            <div class="viz__progress" id="vizProgress"></div>
+
+            <div class="viz__stage">
+              <div class="viz__panel">
+                <div class="viz__panel-title">Code <small>highlighted = what the engine is looking at</small></div>
+                <div class="code-lines" id="vizCode"></div>
+                <div class="viz__panel-title">Console output</div>
+                <div class="console" id="vizConsole"></div>
+              </div>
+
+              <div class="viz__panel">
+                <div class="viz__panel-title">Call stack <small>newest on top</small></div>
+                <div class="viz-legend">
+                  <span><i class="swatch swatch--creation"></i>Creation phase</span>
+                  <span><i class="swatch swatch--execution"></i>Execution phase</span>
+                  <span><i class="swatch swatch--tdz"></i>Uninitialized (TDZ)</span>
+                </div>
+                <div class="stack" id="vizStack"></div>
+                <div class="stack__floor">bottom of the stack</div>
+                <div id="vizClosure"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 04 · EACH CALL GETS ITS OWN ============ -->
+        <section class="section" id="own-closure">
+          <div class="section__num">04</div>
+          <h2>Each call gets its own closure</h2>
+          <p>A very common interview follow-up:</p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>create-counter.js</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">function</span> <span class="tok-fn">createCounter</span>() {
+  <span class="tok-keyword">let</span> count = <span class="tok-type">0</span>;
+
+  <span class="tok-keyword">return</span> <span class="tok-keyword">function</span> () {
+    count++;
+    <span class="tok-keyword">return</span> count;
+  };
+}
+
+<span class="tok-keyword">const</span> counter1 = <span class="tok-fn">createCounter</span>();
+<span class="tok-keyword">const</span> counter2 = <span class="tok-fn">createCounter</span>();
+
+<span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-fn">counter1</span>()); <span class="tok-comment">// 1</span>
+<span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-fn">counter1</span>()); <span class="tok-comment">// 2</span>
+<span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-fn">counter1</span>()); <span class="tok-comment">// 3</span>
+
+<span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-fn">counter2</span>()); <span class="tok-comment">// 1</span></code></pre>
+          </div>
+
+          <p>
+            <strong>Why does <code>counter2()</code> start from 1?</strong>
+            Because each call to <code>createCounter()</code> creates a new
+            lexical environment with a fresh <code>count = 0</code>.
+            <code>counter1</code> and <code>counter2</code> don't share it.
+          </p>
+
+          <h3>Try it: a counter factory</h3>
+          <p>
+            Each button press below really calls a <code>createCounter()</code>
+            function in this page. Make a few counters and click them in any
+            order.
+          </p>
+
+          <div class="playground" id="factory">
+            <div class="playground__bar">
+              <button class="btn btn--primary" type="button" data-create>createCounter()</button>
+              <button class="btn" type="button" data-reset>Reset</button>
+            </div>
+            <div class="factory__list"></div>
+            <div class="playground__label">Console</div>
+            <div class="console" aria-live="polite"><div class="console__empty">Nothing printed yet.</div></div>
+          </div>
+        </section>
+
+        <!-- ============ 05 · PRIVATE VARIABLES ============ -->
+        <section class="section" id="private">
+          <div class="section__num">05</div>
+          <h2>Closures give you private variables</h2>
+          <p>
+            This is one of the most useful practical applications. The only way
+            to reach <code>balance</code> is through the functions that closed
+            over it.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>bank-account.js</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">function</span> <span class="tok-fn">createBankAccount</span>() {
+  <span class="tok-keyword">let</span> balance = <span class="tok-type">1000</span>;
+
+  <span class="tok-keyword">return</span> {
+    <span class="tok-fn">getBalance</span>() {
+      <span class="tok-keyword">return</span> balance;
+    },
+
+    <span class="tok-fn">deposit</span>(amount) {
+      balance += amount;
+    }
+  };
+}
+
+<span class="tok-keyword">const</span> account = <span class="tok-fn">createBankAccount</span>();
+
+account.<span class="tok-fn">deposit</span>(<span class="tok-type">500</span>);
+
+<span class="tok-fn">console</span>.<span class="tok-fn">log</span>(account.<span class="tok-fn">getBalance</span>()); <span class="tok-comment">// 1500</span>
+<span class="tok-fn">console</span>.<span class="tok-fn">log</span>(account.balance);      <span class="tok-comment">// undefined</span></code></pre>
+          </div>
+
+          <p>
+            <code>account.balance</code> is <code>undefined</code> because
+            <code>balance</code> is a variable in the closure, not a property of
+            the returned object. This is encapsulation without classes.
+          </p>
+
+          <h3>Try it: poke at the account</h3>
+          <div class="playground" id="bank">
+            <div class="playground__bar">
+              <button class="btn" type="button" data-action="deposit">deposit(500)</button>
+              <button class="btn" type="button" data-action="getBalance">getBalance()</button>
+              <button class="btn" type="button" data-action="direct">account.balance</button>
+              <button class="btn" type="button" data-action="hack">account.balance = 0</button>
+              <button class="btn" type="button" data-action="reset">New account</button>
+            </div>
+            <div class="playground__label">Console</div>
+            <div class="console" aria-live="polite"><div class="console__empty">Press a button to run it.</div></div>
+          </div>
+
+          <div class="callout callout--good">
+            <div class="callout__icon">🔒</div>
+            <div>
+              <p>
+                Setting <code>account.balance = 0</code> just adds a new,
+                unrelated property to the object. The real
+                <code>balance</code> inside the closure is untouched.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 06 · TIMERS ============ -->
+        <section class="section" id="timers">
+          <div class="section__num">06</div>
+          <h2>Closures and timers</h2>
+          <p>Another very common interview question:</p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>timeout.js</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">function</span> <span class="tok-fn">test</span>() {
+  <span class="tok-keyword">let</span> name = <span class="tok-string">"John"</span>;
+
+  <span class="tok-fn">setTimeout</span>(() =&gt; {
+    <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(name);
+  }, <span class="tok-type">1000</span>);
+}
+
+<span class="tok-fn">test</span>(); <span class="tok-comment">// after 1 second: John</span></code></pre>
+          </div>
+
+          <p>
+            <code>test()</code> finishes immediately, but one second later
+            <code>John</code> is still printed. The callback
+            <code>() =&gt; { console.log(name); }</code> forms a closure over
+            <code>name</code>. Step through the <strong>setTimeout</strong>
+            example in the <a href="#visualizer">visualizer</a> to watch it.
+          </p>
+
+          <h3 id="loop-trap">The loop trap (the warm-up puzzle)</h3>
+          <p>
+            With <code>var</code>, the loop has <em>one</em> <code>i</code>.
+            All three callbacks close over that same variable, and they only
+            run after the loop has finished and set it to <code>3</code>. With
+            <code>let</code>, every iteration gets its own <code>i</code>, so
+            each callback closes over a different variable.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Loop variable</th><th>How many <code>i</code> variables?</th><th>Prints</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>for (var i = 0; ...)</code></td><td>One, shared by the whole loop</td><td><code>3 3 3</code></td></tr>
+                <tr><td><code>for (let i = 0; ...)</code></td><td>A new one per iteration</td><td><code>0 1 2</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>loop-fixed.js</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-comment">// Fix 1: use let</span>
+<span class="tok-keyword">for</span> (<span class="tok-keyword">let</span> i = <span class="tok-type">0</span>; i &lt; <span class="tok-type">3</span>; i++) {
+  <span class="tok-fn">setTimeout</span>(() =&gt; <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(i), <span class="tok-type">100</span>); <span class="tok-comment">// 0 1 2</span>
+}
+
+<span class="tok-comment">// Fix 2 (pre-ES6): create a new scope with a function</span>
+<span class="tok-keyword">for</span> (<span class="tok-keyword">var</span> i = <span class="tok-type">0</span>; i &lt; <span class="tok-type">3</span>; i++) {
+  (<span class="tok-keyword">function</span> (j) {
+    <span class="tok-fn">setTimeout</span>(() =&gt; <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(j), <span class="tok-type">100</span>); <span class="tok-comment">// 0 1 2</span>
+  })(i);
+}</code></pre>
+          </div>
+        </section>
+
+        <!-- ============ 07 · REACT NATIVE ============ -->
+        <section class="section" id="react-native">
+          <div class="section__num">07</div>
+          <h2>Closures in React and React Native</h2>
+          <p>
+            The closure mechanism is plain JavaScript. It isn't a React Native
+            feature and has nothing to do with the native architecture. React
+            and React Native simply run on top of it, then render to different
+            places.
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">JavaScript</div>
+              <div class="arrow"></div>
+              <div class="node node--js">Closure<small>same mechanism everywhere</small></div>
+              <div class="arrow arrow--stem"></div>
+              <div class="fork"></div>
+              <div class="branch">
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node">React</div>
+                  <div class="arrow"></div>
+                  <div class="node node--ghost">Browser DOM</div>
+                </div>
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new">React Native</div>
+                  <div class="arrow"></div>
+                  <div class="node node--ghost">iOS / Android</div>
+                </div>
+              </div>
+            </div>
+            <figcaption class="diagram__caption">The difference is only the UI and native environment, not how closures work.</figcaption>
+          </figure>
+
+          <h3>An event handler is a closure</h3>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>Counter.tsx</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">function</span> <span class="tok-fn">Counter</span>() {
+  <span class="tok-keyword">const</span> [count, setCount] = <span class="tok-fn">useState</span>(<span class="tok-type">0</span>);
+
+  <span class="tok-keyword">const</span> handlePress = () =&gt; {
+    <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(count);
+  };
+
+  <span class="tok-keyword">return</span> (
+    &lt;<span class="tok-type">Button</span>
+      title=<span class="tok-string">"Count"</span>
+      onPress={handlePress}
+    /&gt;
+  );
+}</code></pre>
+          </div>
+          <p>
+            <code>handlePress</code> is a closure. It remembers the
+            <code>count</code> variable <strong>from the render in which
+            <code>handlePress</code> was created</strong>.
+          </p>
+
+          <p>The same thing in a typical screen:</p>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>ProfileScreen.tsx</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">function</span> <span class="tok-fn">ProfileScreen</span>() {
+  <span class="tok-keyword">const</span> [name, setName] = <span class="tok-fn">useState</span>(<span class="tok-string">"John"</span>);
+
+  <span class="tok-keyword">const</span> handlePress = () =&gt; {
+    <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(name);
+  };
+
+  <span class="tok-keyword">return</span> (
+    &lt;&gt;
+      &lt;<span class="tok-type">Text</span>&gt;{name}&lt;/<span class="tok-type">Text</span>&gt;
+      &lt;<span class="tok-type">Button</span> title=<span class="tok-string">"Print Name"</span> onPress={handlePress} /&gt;
+    &lt;/&gt;
+  );
+}</code></pre>
+          </div>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node">Button pressed</div>
+              <div class="arrow"></div>
+              <div class="node node--js">handlePress()</div>
+              <div class="arrow"></div>
+              <div class="node node--new">its closure</div>
+              <div class="arrow"></div>
+              <div class="node node--js">name = "John"</div>
+            </div>
+          </figure>
+
+          <h3>Each render has its own closure</h3>
+          <p>
+            This is the part interviewers want you to understand. A function
+            component is just a function. Every render calls it again, which
+            creates a new lexical environment with that render's
+            <code>count</code>, and a brand-new <code>handlePress</code> that
+            closes over it.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Render</th><th><code>count</code> in that render</th><th>That render's <code>handlePress</code> remembers</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>#1 (initial)</td><td><code>0</code></td><td><code>0</code></td></tr>
+                <tr><td>#2 (after <code>setCount(1)</code>)</td><td><code>1</code></td><td><code>1</code></td></tr>
+                <tr><td>#3 (after <code>setCount(2)</code>)</td><td><code>2</code></td><td><code>2</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Try it: renders and their closures</h3>
+          <p>
+            Each <strong>setCount</strong> below "renders" the component again
+            by calling a function, which creates a real new
+            <code>handlePress</code>. Old renders are gone from the screen, but
+            if something still holds their <code>handlePress</code>, it still
+            remembers the old value. Press them to check.
+          </p>
+
+          <div class="playground" id="renders">
+            <div class="playground__bar">
+              <button class="btn btn--primary" type="button" data-set-count>setCount(count + 1)</button>
+              <button class="btn" type="button" data-reset>Reset</button>
+            </div>
+            <div class="factory__list"></div>
+            <div class="playground__label">Console</div>
+            <div class="console" aria-live="polite"><div class="console__empty">Press a handlePress() button.</div></div>
+          </div>
+
+          <h3>Where you meet closures in a component</h3>
+          <div class="cards cards--4">
+            <div class="card">
+              <div class="card__title">Event handlers</div>
+              <p>An <code>onPress</code> arrow function closes over props like <code>id</code>.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">Effects</div>
+              <p>The <code>useEffect</code> callback sees the state from the render that created it.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">Memoized callbacks</div>
+              <p><code>useCallback</code> keeps one closure until its dependencies change.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">Custom hooks</div>
+              <p>Hooks return functions that close over the hook's state and refs.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 08 · STALE CLOSURES ============ -->
+        <section class="section" id="stale">
+          <div class="section__num">08</div>
+          <h2>Stale closures</h2>
+          <p>
+            Because each render has its own closure, a callback that lives
+            longer than its render (a timer, an interval, a subscription, a
+            memoized function) keeps seeing that render's values. This is a
+            very common interview question.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>Counter.tsx</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">function</span> <span class="tok-fn">Counter</span>() {
+  <span class="tok-keyword">const</span> [count, setCount] = <span class="tok-fn">useState</span>(<span class="tok-type">0</span>);
+
+  <span class="tok-keyword">const</span> handlePress = () =&gt; {
+    <span class="tok-fn">setTimeout</span>(() =&gt; {
+      <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(count);
+    }, <span class="tok-type">3000</span>);
+  };
+
+  <span class="tok-keyword">return</span> (
+    &lt;&gt;
+      &lt;<span class="tok-type">Text</span>&gt;{count}&lt;/<span class="tok-type">Text</span>&gt;
+      &lt;<span class="tok-type">Button</span> title=<span class="tok-string">"Start"</span> onPress={handlePress} /&gt;
+      &lt;<span class="tok-type">Button</span> title=<span class="tok-string">"Increment"</span> onPress={() =&gt; <span class="tok-fn">setCount</span>(c =&gt; c + <span class="tok-type">1</span>)} /&gt;
+    &lt;/&gt;
+  );
+}</code></pre>
+          </div>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">count = 0</div>
+              <div class="arrow"></div>
+              <div class="node">Press Start<small>timer callback closes over count = 0</small></div>
+              <div class="arrow"></div>
+              <div class="node">Increment to 5<small>new renders, new closures</small></div>
+              <div class="arrow"></div>
+              <div class="node node--old">3 seconds pass → prints 0, not 5</div>
+            </div>
+          </figure>
+
+          <p>
+            <strong>Why?</strong> The callback
+            <code>() =&gt; { console.log(count); }</code> closed over the
+            <code>count</code> from the render where Start was pressed. It
+            doesn't automatically look up the latest state. That's a
+            <strong>stale closure</strong>.
+          </p>
+
+          <h3>Try it: Start, then Increment quickly</h3>
+          <p>
+            This runs the same logic with real closures. The timer prints both
+            what its closure captured and what a <code>useRef</code>-style ref
+            holds.
+          </p>
+
+          <div class="playground" id="stalePlay">
+            <div class="playground__screen">
+              <span class="playground__screen-label">&lt;Text&gt;</span>
+              <span class="playground__screen-value" data-count>0</span>
+            </div>
+            <div class="playground__bar">
+              <button class="btn btn--primary" type="button" data-start>Start (3s timer)</button>
+              <button class="btn" type="button" data-increment>Increment</button>
+              <button class="btn" type="button" data-reset>Reset</button>
+            </div>
+            <div class="playground__label">Console</div>
+            <div class="console" aria-live="polite"><div class="console__empty">Press Start, then Increment a few times.</div></div>
+          </div>
+
+          <h3>How do you fix stale closures?</h3>
+          <p>There are several approaches, depending on the situation.</p>
+
+          <h3>Fix 1: functional state update</h3>
+          <p>If you're updating state based on the previous state, let React hand you the latest value:</p>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>functional-update.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-fn">setCount</span>(prev =&gt; prev + <span class="tok-type">1</span>); <span class="tok-comment">// ✅ always based on the latest value</span>
+<span class="tok-fn">setCount</span>(count + <span class="tok-type">1</span>);       <span class="tok-comment">// ⚠️ uses this render's count</span></code></pre>
+          </div>
+          <p>
+            This is safer, especially when multiple updates are queued or when
+            the update happens inside a long-lived callback like an interval:
+          </p>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>Ticker.tsx</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-fn">useEffect</span>(() =&gt; {
+  <span class="tok-keyword">const</span> id = <span class="tok-fn">setInterval</span>(() =&gt; {
+    <span class="tok-fn">setCount</span>(count + <span class="tok-type">1</span>);    <span class="tok-comment">// ❌ count is always 0: stuck at 1</span>
+    <span class="tok-fn">setCount</span>(c =&gt; c + <span class="tok-type">1</span>);   <span class="tok-comment">// ✅ keeps counting</span>
+  }, <span class="tok-type">1000</span>);
+  <span class="tok-keyword">return</span> () =&gt; <span class="tok-fn">clearInterval</span>(id);
+}, []);</code></pre>
+          </div>
+
+          <h3>Fix 2: <code>useRef</code> for the latest value</h3>
+          <p>If you need to <em>read</em> the latest value inside a long-lived callback:</p>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>latest-ref.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">const</span> countRef = <span class="tok-fn">useRef</span>(count);
+
+<span class="tok-fn">useEffect</span>(() =&gt; {
+  countRef.current = count;
+}, [count]);
+
+<span class="tok-fn">setTimeout</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(countRef.current); <span class="tok-comment">// latest value</span>
+}, <span class="tok-type">3000</span>);</code></pre>
+          </div>
+          <p>
+            The closure still captures something old, but what it captures is
+            the <em>ref object</em>, which is the same object on every render.
+            Its <code>.current</code> property is updated, so reading it gives
+            the latest value.
+          </p>
+
+          <h3>Fix 3: correct dependencies in <code>useEffect</code></h3>
+          <div class="compare">
+            <div class="code-block">
+              <div class="code-block__head"><span>❌ stale</span></div>
+              <pre><code><span class="tok-fn">useEffect</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(count);
+}, []);</code></pre>
+            </div>
+            <div class="code-block">
+              <div class="code-block__head"><span>✅ fresh</span></div>
+              <pre><code><span class="tok-fn">useEffect</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(count);
+}, [count]);</code></pre>
+            </div>
+          </div>
+          <p>
+            With <code>[]</code>, the effect runs once and captures
+            <code>count = 0</code> from the initial render. It never runs again
+            when <code>count</code> changes, so it only ever sees
+            <code>0</code>. With <code>[count]</code>, React runs a new effect
+            (with a new closure) every time <code>count</code> changes.
+          </p>
+
+          <h3>Fix 4: correct dependencies in <code>useCallback</code></h3>
+          <div class="compare">
+            <div class="code-block">
+              <div class="code-block__head"><span>❌ stale</span></div>
+              <pre><code><span class="tok-keyword">const</span> handlePress = <span class="tok-fn">useCallback</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(count);
+}, []);</code></pre>
+            </div>
+            <div class="code-block">
+              <div class="code-block__head"><span>✅ fresh</span></div>
+              <pre><code><span class="tok-keyword">const</span> handlePress = <span class="tok-fn">useCallback</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(count);
+}, [count]);</code></pre>
+            </div>
+          </div>
+          <p>
+            The dependency <code>[count]</code> tells React: "this callback
+            depends on <code>count</code>; give me an updated callback when
+            <code>count</code> changes." Without it, <code>useCallback</code>
+            keeps returning the closure from the first render, which captured
+            the initial value.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Situation</th><th>Fix</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>New state depends on the old state</td><td><code>setCount(prev =&gt; prev + 1)</code></td></tr>
+                <tr><td>A long-lived callback must <em>read</em> the latest value</td><td><code>useRef</code> + update <code>.current</code></td></tr>
+                <tr><td><code>useEffect</code> uses a value</td><td>Put it in the dependency array</td></tr>
+                <tr><td><code>useCallback</code> / <code>useMemo</code> uses a value</td><td>Put it in the dependency array</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">💡</div>
+            <div>
+              <p>
+                The <code>react-hooks/exhaustive-deps</code> ESLint rule warns
+                you about most missing dependencies before they become stale
+                closures. Keep it on.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 09 · PREDICT ============ -->
+        <section class="section" id="predict">
+          <div class="section__num">09</div>
+          <h2>Predict the output</h2>
+          <p>Guess each answer, then reveal it.</p>
+          <!-- Filled by js/closures/playgrounds.js -->
+          <div class="this-grid" id="predictGrid"></div>
+        </section>
+
+        <!-- ============ 10 · INTERVIEW ANSWER ============ -->
+        <section class="section" id="interview">
+          <div class="section__num">10</div>
+          <h2>The interview answer</h2>
+
+          <h3>Closure in one sentence (memorize this)</h3>
+          <blockquote class="answer">
+            <p>
+              "A closure is a function together with its surrounding lexical
+              environment, allowing the function to access variables from its
+              outer scope even after the outer function has finished
+              execution."
+            </p>
+          </blockquote>
+
+          <h3>"Where do you use closures?"</h3>
+          <blockquote class="answer">
+            <p>
+              "Closures are commonly used for data encapsulation and private
+              state, callbacks, event handlers, timers, function factories,
+              memoization, and asynchronous JavaScript. In React and React
+              Native, closures are especially common in event handlers,
+              effects, callbacks, and hooks."
+            </p>
+          </blockquote>
+
+          <h3>"How does closure work in React Native?"</h3>
+          <blockquote class="answer">
+            <p>
+              "Closures in React Native work the same way as normal JavaScript
+              closures. Functional React components create new lexical
+              environments on each render, and event handlers, effects and
+              callbacks can capture values from the render in which they were
+              created. This can lead to stale closures when a callback retains
+              an older state or prop value."
+            </p>
+          </blockquote>
+
+          <div class="callout callout--warn">
+            <div class="callout__icon">⚠️</div>
+            <div>
+              <p>
+                Don't explain closures as a native architecture feature (Bridge,
+                JSI, Fabric). They're pure JavaScript. Follow up with how you
+                fix stale closures: functional updates, <code>useRef</code>,
+                and correct dependency arrays.
+              </p>
+            </div>
+          </div>
+
+          <h3>Closure uses at a glance</h3>
+          <div class="cheat-sheet">
+            <div><b>Private state</b><span>bank account, counters</span></div>
+            <div><b>Factories</b><span>multiplier(2), createCounter()</span></div>
+            <div><b>Callbacks</b><span>map, filter, event handlers</span></div>
+            <div><b>Timers</b><span>setTimeout, setInterval</span></div>
+            <div><b>Memoization</b><span>a cache object in the closure</span></div>
+            <div><b>Async code</b><span>.then(), await, fetch handlers</span></div>
+            <div><b>Hooks</b><span>useEffect, useCallback</span></div>
+            <div><b>Debounce</b><span>the timer id lives in a closure</span></div>
+          </div>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">🎯</div>
+            <div>
+              <p class="callout__title">Bonus points in an interview</p>
+              <p>
+                Mention that closures hold a live reference (not a copy), that
+                every call creates a new closure, and that closures keep memory
+                alive, so a forgotten listener or interval can cause a memory
+                leak. Then give the stale-closure example from React Native.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 11 · QUIZ ============ -->
+        <section class="section" id="quiz-section">
+          <div class="section__num">11</div>
+          <h2>Check yourself</h2>
+          <p>Seven quick questions on everything above.</p>
+          <!-- Filled by js/execution-context/quiz.js from js/closures/quiz-questions.js -->
+          <div class="quiz" id="quiz"></div>
+          <p class="quiz__score" id="quizScore" aria-live="polite"></p>
+        </section>
+
+        <footer class="footer">
+          JavaScript Closures: an interactive lesson.
+          Previous topic: <a href="execution-context.html">JavaScript Execution Context</a>.
+          Next topic: <a href="threads.html">Threads &amp; Event Loop</a>.
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

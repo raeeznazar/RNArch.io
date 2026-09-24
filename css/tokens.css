@@ -26,6 +26,15 @@
   --new:         light-dark(#067647, #4fd18b);  /* new architecture */
   --new-soft:    light-dark(#e7f6ee, #10301f);
   --warn-soft:   light-dark(#fdecea, #3a1714);
+  --warn:        light-dark(#b42318, #ff8a80);  /* errors */
+
+  /* Execution-context lesson: the two phases + "found" highlight */
+  --create:      light-dark(#6b4fe0, #a993ff);  /* creation phase */
+  --create-soft: light-dark(#ece7ff, #2a2250);
+  --exec:        var(--new);                    /* execution phase */
+  --exec-soft:   var(--new-soft);
+  --mark:        light-dark(#f0c419, #e2b714);  /* highlighted value */
+  --mark-soft:   light-dark(#fff4c4, #3a3212);
 
   /* Code */
   --code-bg:     light-dark(#f6f8fa, #12161c);

@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JavaScript Threads & Event Loop · PrepStack</title>
+    <meta
+      name="description"
+      content="Single-threaded JavaScript vs asynchronous execution: the call stack, event loop, microtasks and tasks, blocking the JS thread, and how threading works in React Native, with a step-by-step event loop visualizer."
+    />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+
+    <!-- Styles (css/main.css imports everything else) -->
+    <link rel="stylesheet" href="css/main.css" />
+
+    <!-- Shared site scripts -->
+    <script src="js/theme.js"></script>
+    <script src="js/sidebar.js" defer></script>
+    <script src="js/copy-code.js" defer></script>
+
+    <!-- This page's scripts. Reuses the highlighter and quiz from execution-context.
+         Order matters: helpers → data → features -->
+    <script src="js/execution-context/highlight.js" defer></script>
+    <script src="js/event-loop/examples.js" defer></script>
+    <script src="js/event-loop/quiz-questions.js" defer></script>
+    <script src="js/event-loop/visualizer.js" defer></script>
+    <script src="js/execution-context/quiz.js" defer></script>
+    <script src="js/event-loop/playgrounds.js" defer></script>
+  </head>
+  <body>
+    <div class="layout">
+      <!-- ============ SIDEBAR ============ -->
+      <aside class="sidebar" aria-label="Table of contents">
+        <div class="sidebar__brand">
+          <span class="sidebar__logo">⚛</span>
+          <span class="sidebar__name">
+            PrepStack
+            <small class="sidebar__tagline">Attend interviews confidently</small>
+          </span>
+          <button class="sidebar__menu-btn" type="button" aria-expanded="false">
+            Contents
+          </button>
+        </div>
+
+        <nav class="sidebar__nav">
+          <!-- Topics: keep this list identical on every page -->
+          <p class="sidebar__label">Topics</p>
+          <ul class="topics">
+            <li><a href="index.html"><span class="topics__icon">⚛</span>React Native Architecture</a></li>
+            <li><a href="execution-context.html"><span class="topics__icon">JS</span>JavaScript Execution Context</a></li>
+            <li><a href="closures.html"><span class="topics__icon">JS</span>JavaScript Closures</a></li>
+            <li><a href="threads.html" aria-current="page"><span class="topics__icon">JS</span>Threads &amp; Event Loop</a></li>
+            <li><a href="token-refresh.html"><span class="topics__icon">🔑</span>Axios Token Refresh</a></li>
+            <li><a href="ssl-security.html"><span class="topics__icon">🔒</span>SSL/TLS &amp; App Security</a></li>
+          </ul>
+
+          <p class="sidebar__label">On this page</p>
+          <ol class="toc">
+            <li><a href="#warm-up">Warm-up puzzle</a></li>
+            <li><a href="#single-threaded">Is JavaScript single-threaded?</a></li>
+            <li><a href="#non-blocking">Waiting without blocking</a></li>
+            <li><a href="#visualizer">The event loop</a></li>
+            <li><a href="#micro-macro">Microtasks vs tasks</a></li>
+            <li><a href="#blocking">Blocking the JS thread</a></li>
+            <li><a href="#react-native">Threads in React Native</a></li>
+            <li><a href="#new-architecture">New Architecture &amp; JSI</a></li>
+            <li><a href="#multiple-threads">Can JS use more threads?</a></li>
+            <li><a href="#interview">Interview answers</a></li>
+            <li><a href="#quiz-section">Check yourself</a></li>
+          </ol>
+          <button class="theme-toggle" type="button" data-theme-toggle>
+            ◐ Toggle theme
+          </button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <!-- ============ HERO ============ -->
+        <header class="hero">
+          <span class="hero__eyebrow">Interview essentials</span>
+          <h1 class="hero__title">JavaScript Threads &amp; Event Loop</h1>
+          <p class="hero__lede">
+            JavaScript runs one thing at a time, yet it handles timers, network
+            requests and taps all at once. The trick is to separate
+            <strong>single-threaded execution</strong> from
+            <strong>asynchronous work</strong>. Get that distinction right and
+            the React Native threading question becomes easy.
+          </p>
+          <div class="chips">
+            <span class="chip">~20 min</span>
+            <span class="chip">Event loop visualizer</span>
+            <span class="chip">Live blocking demo</span>
+            <span class="chip">6-question quiz</span>
+          </div>
+        </header>
+
+        <!-- ============ 01 · WARM-UP PUZZLE ============ -->
+        <section class="section" id="warm-up">
+          <div class="section__num">01</div>
+          <h2>Warm-up puzzle</h2>
+          <p>Extremely common in interviews. Pick the output order.</p>
+
+          <div class="puzzle" id="puzzle">
+            <div class="code-block">
+              <div class="code-block__head"><span>puzzle.js</span></div>
+              <pre><code><span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"A"</span>);
+
+<span class="tok-fn">setTimeout</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"B"</span>);
+}, <span class="tok-type">0</span>);
+
+<span class="tok-fn">Promise</span>.<span class="tok-fn">resolve</span>().<span class="tok-fn">then</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"C"</span>);
+});
+
+<span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"D"</span>);</code></pre>
+            </div>
+            <div class="puzzle__question">What gets printed?</div>
+            <div class="puzzle__choices">
+              <button class="btn" type="button" data-answer="ABCD">A B C D</button>
+              <button class="btn" type="button" data-answer="ADBC">A D B C</button>
+              <button class="btn" type="button" data-answer="ADCB">A D C B</button>
+            </div>
+            <p class="puzzle__feedback" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <!-- ============ 02 · SINGLE-THREADED ============ -->
+        <section class="section" id="single-threaded">
+          <div class="section__num">02</div>
+          <h2>Is JavaScript single-threaded?</h2>
+          <p>
+            Yes. JavaScript execution is traditionally single-threaded: one JS
+            execution thread has <strong>one call stack</strong>, and it
+            executes <strong>one piece of JavaScript at a time</strong>.
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <span class="flow__label">JavaScript thread</span>
+              <div class="node node--js">Call stack<small>function A() · function B() · console.log()</small></div>
+              <div class="arrow"></div>
+              <div class="node">One at a time<small>the next piece only starts when the current one finishes</small></div>
+            </div>
+          </figure>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">🍳</div>
+            <div>
+              <p class="callout__title">One chef, many timers</p>
+              <p>
+                A kitchen with one chef can still cook five dishes. The chef
+                starts the oven, sets a timer, and keeps chopping. When a timer
+                rings, the chef deals with it as soon as their hands are free.
+                The chef is the JS thread. The oven and timers are the runtime.
+              </p>
+            </div>
+          </div>
+
+          <p>
+            Single-threaded does <strong>not</strong> mean JavaScript can't
+            handle multiple asynchronous operations. That's where the event
+            loop comes in.
+          </p>
+        </section>
+
+        <!-- ============ 03 · NON-BLOCKING ============ -->
+        <section class="section" id="non-blocking">
+          <div class="section__num">03</div>
+          <h2>JavaScript doesn't block while waiting</h2>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>timeout.js</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"A"</span>);
+
+<span class="tok-fn">setTimeout</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"B"</span>);
+}, <span class="tok-type">1000</span>);
+
+<span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"C"</span>);
+
+<span class="tok-comment">// Output: A, C, B</span></code></pre>
+          </div>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">console.log("A")</div>
+              <div class="arrow"></div>
+              <div class="node node--js">setTimeout()<small>timer handed to the runtime</small></div>
+              <div class="arrow"></div>
+              <div class="node node--js">console.log("C")</div>
+              <div class="arrow"></div>
+              <div class="node">Call stack empty</div>
+              <div class="arrow"></div>
+              <div class="node node--new">Timer done → callback runs → "B"</div>
+            </div>
+          </figure>
+
+          <p>
+            JavaScript doesn't sit there for one second doing nothing. The
+            timer is tracked outside the call stack, and the callback runs
+            once the timer is done <em>and</em> the stack is empty.
+          </p>
+        </section>
+
+        <!-- ============ 04 · EVENT LOOP ============ -->
+        <section class="section" id="visualizer">
+          <div class="section__num">04</div>
+          <h2>The event loop</h2>
+          <p>The important pieces:</p>
+
+          <div class="cards cards--4">
+            <div class="card">
+              <div class="card__title">Call stack</div>
+              <p>Where JavaScript runs. One stack, one frame at a time.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">Web / Native APIs</div>
+              <p>Timers, network, sensors. Provided by the browser, or by the React Native runtime and platform.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">Queues</div>
+              <p>Microtasks (promise callbacks) and tasks (timer callbacks, events) wait here.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">Event loop</div>
+              <p>When the stack is empty, it moves the next callback onto it: microtasks first.</p>
+            </div>
+          </div>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">Call stack<small>runs your JavaScript</small></div>
+              <div class="arrow"></div>
+              <div class="node node--ghost">Web / Native APIs<small>timers, networking, native modules</small></div>
+              <div class="arrow arrow--stem"></div>
+              <div class="fork"></div>
+              <div class="branch">
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node">Microtask queue<small>Promise callbacks</small></div>
+                </div>
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--old">Task queue<small>setTimeout, events</small></div>
+                </div>
+              </div>
+              <div class="join"></div>
+              <div class="arrow arrow--short"></div>
+              <div class="node node--new">Event loop<small>stack empty? run microtasks, then the next task</small></div>
+              <div class="arrow"></div>
+              <div class="node node--js">Back on the call stack</div>
+            </div>
+          </figure>
+
+          <p>
+            In a browser, timers and networking are provided by the browser.
+            In React Native, similar capabilities are provided by the React
+            Native runtime and the platform rather than a browser.
+          </p>
+
+          <h3>Watch it run</h3>
+          <p>
+            Pick a program, then press <strong>Next</strong> (or use your
+            <kbd>←</kbd> <kbd>→</kbd> arrow keys).
+          </p>
+
+          <!-- Filled by js/event-loop/visualizer.js -->
+          <div class="viz-tabs" id="loopTabs" role="tablist"></div>
+
+          <div class="viz" id="loopViz">
+            <div class="viz__narration">
+              <div aria-live="polite">
+                <span class="phase-tag" id="loopPhase">Synchronous code</span>
+                <h3 class="viz__title" id="loopTitle"></h3>
+                <p class="viz__text" id="loopText"></p>
+              </div>
+              <div class="viz__controls">
+                <button class="btn" type="button" id="loopRestart">Restart</button>
+                <button class="btn" type="button" id="loopPrev">Back</button>
+                <button class="btn btn--primary" type="button" id="loopNext">Next</button>
+                <button class="btn" type="button" id="loopPlay">Play</button>
+              </div>
+            </div>
+            <div class="viz__count" id="loopCount"></div>
+            <div class="viz__progress" id="loopProgress"></div>
+
+            <div class="viz__stage">
+              <div class="viz__panel">
+                <div class="viz__panel-title">Code <small>highlighted = running now</small></div>
+                <div class="code-lines" id="loopCode"></div>
+                <div class="viz__panel-title">Console output</div>
+                <div class="console" id="loopConsole"></div>
+              </div>
+
+              <div class="viz__panel">
+                <div class="viz__panel-title">Runtime</div>
+                <div class="lanes">
+                  <div class="lane lane--stack">
+                    <div class="lane__title">Call stack <small>newest on top</small></div>
+                    <div class="lane__items" id="loopStack"></div>
+                  </div>
+                  <div class="lane lane--apis">
+                    <div class="lane__title">Web / Native APIs <small>outside the JS thread</small></div>
+                    <div class="lane__items" id="loopApis"></div>
+                  </div>
+                  <div class="lane lane--micro">
+                    <div class="lane__title">Microtask queue <small>runs first</small></div>
+                    <div class="lane__items" id="loopMicro"></div>
+                  </div>
+                  <div class="lane lane--tasks">
+                    <div class="lane__title">Task queue <small>one per loop turn</small></div>
+                    <div class="lane__items" id="loopTasks"></div>
+                  </div>
+                </div>
+                <div class="loop-status" id="loopStatus" aria-live="polite"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 05 · MICROTASKS VS TASKS ============ -->
+        <section class="section" id="micro-macro">
+          <div class="section__num">05</div>
+          <h2>Microtasks vs macrotasks</h2>
+          <p>This is extremely important for interviews.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th></th><th>Microtasks</th><th>Macrotasks (tasks)</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Examples</td><td><code>Promise.then()</code>, <code>catch</code>, <code>finally</code>, code after <code>await</code>, <code>queueMicrotask()</code></td><td><code>setTimeout()</code>, <code>setInterval()</code>, UI events, network callbacks</td></tr>
+                <tr><td>When they run</td><td>As soon as the current synchronous code finishes</td><td>One per turn of the event loop</td></tr>
+                <tr><td>How many at once</td><td>All of them, until the queue is empty</td><td>Just the next one, then microtasks again</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <blockquote class="answer">
+            <p>
+              <strong>The rule:</strong> after the current synchronous code
+              finishes, all microtasks are processed before the next task.
+            </p>
+          </blockquote>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>order.js</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"A"</span>);
+
+<span class="tok-fn">setTimeout</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"B"</span>);
+}, <span class="tok-type">0</span>);
+
+<span class="tok-fn">Promise</span>.<span class="tok-fn">resolve</span>().<span class="tok-fn">then</span>(() =&gt; {
+  <span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"C"</span>);
+});
+
+<span class="tok-fn">console</span>.<span class="tok-fn">log</span>(<span class="tok-string">"D"</span>);
+
+<span class="tok-comment">// Output: A, D, C, B</span></code></pre>
+          </div>
+
+          <div class="cheat-sheet">
+            <div><b>1 · Synchronous</b><span>A, D</span></div>
+            <div><b>2 · Microtasks</b><span>C (the promise)</span></div>
+            <div><b>3 · Tasks</b><span>B (the timer)</span></div>
+            <div><b>Delay 0?</b><span>still waits its turn</span></div>
+          </div>
+
+          <div class="callout callout--warn">
+            <div class="callout__icon">⚠️</div>
+            <div>
+              <p class="callout__title">Microtasks can starve everything else</p>
+              <p>
+                Because the microtask queue is always emptied completely, a
+                promise chain that keeps queuing new microtasks can hold off
+                timers, events and rendering, just like a long loop would.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 06 · BLOCKING ============ -->
+        <section class="section" id="blocking">
+          <div class="section__num">06</div>
+          <h2>Blocking the JS thread</h2>
+          <p>
+            One thread means that while a long piece of synchronous code runs,
+            nothing else in JavaScript can: no timers, no promise callbacks, no
+            event handlers. The <strong>Blocking the thread</strong> example in
+            the <a href="#visualizer">visualizer</a> shows a "0 ms" timer
+            waiting 2 seconds.
+          </p>
+
+          <h3>Try it: freeze this page's JS thread</h3>
+          <p>
+            Both balls move. The blue one is moved by JavaScript every frame,
+            like a JS-driven animation. The green one is a CSS animation the
+            browser can run off the main thread, like
+            <code>useNativeDriver</code> or Reanimated on the UI thread in
+            React Native. Press <strong>Block</strong>, then tap
+            <strong>Tap me</strong> a few times while it's frozen.
+          </p>
+
+          <div class="playground block-demo" id="blockDemo">
+            <div class="block-demo__tracks">
+              <div class="track">
+                <div class="track__label">JS-driven <small>requestAnimationFrame</small></div>
+                <div class="track__rail"><div class="track__runner" data-js-runner><div class="track__ball"></div></div></div>
+              </div>
+              <div class="track">
+                <div class="track__label">Off the main thread <small>CSS transform animation</small></div>
+                <div class="track__rail"><div class="track__runner track__runner--css"><div class="track__ball"></div></div></div>
+              </div>
+            </div>
+            <div class="block-demo__taps">
+              <button class="btn" type="button" data-tap>Tap me</button>
+              <span>Taps handled: <b data-tap-count>0</b></span>
+              <span class="block-demo__status" data-status>Idle</span>
+            </div>
+            <div class="playground__bar">
+              <button class="btn btn--primary" type="button" data-block>Block for 2 s</button>
+              <button class="btn" type="button" data-chunk>Same work, in chunks</button>
+            </div>
+            <div class="playground__label">Console</div>
+            <div class="console" aria-live="polite"><div class="console__empty">Press a button to start.</div></div>
+          </div>
+
+          <p>
+            What you should see: during the block, the blue ball freezes and
+            your taps don't register until the block ends, then they're all
+            handled at once (they were waiting in the task queue). The green
+            ball keeps moving. With <strong>in chunks</strong>, the same work
+            is split into small slices with <code>setTimeout</code> between
+            them, so the page stays responsive.
+          </p>
+        </section>
+
+        <!-- ============ 07 · REACT NATIVE ============ -->
+        <section class="section" id="react-native">
+          <div class="section__num">07</div>
+          <h2>Threads in React Native</h2>
+          <p>
+            React Native has historically been described in terms of multiple
+            execution threads: the <strong>JavaScript thread</strong>, the
+            <strong>UI / main thread</strong>, and threads for
+            <strong>native modules and other native work</strong>.
+          </p>
+
+          <div class="callout callout--warn">
+            <div class="callout__icon">⚠️</div>
+            <div>
+              <p>
+                The exact threading model varies with the React Native version
+                and architecture. Don't oversimplify it as "React Native has
+                exactly three threads."
+              </p>
+            </div>
+          </div>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node">React Native app</div>
+              <div class="arrow arrow--stem"></div>
+              <div class="fork"></div>
+              <div class="branch">
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--js node--fluid">JavaScript runtime<small>React logic · state management · JS callbacks</small></div>
+                </div>
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new node--fluid">Native platform<small>UI · platform APIs · native work</small></div>
+                </div>
+              </div>
+            </div>
+          </figure>
+
+          <h3>The JavaScript thread</h3>
+          <p>Your JavaScript code generally runs on the JS runtime / thread:</p>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>handler.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">const</span> handlePress = () =&gt; {
+  <span class="tok-fn">calculateSomething</span>();
+  <span class="tok-fn">setCount</span>(count + <span class="tok-type">1</span>);
+};</code></pre>
+          </div>
+
+          <div class="cards cards--4">
+            <div class="card"><div class="card__title">Components</div><p>React rendering and component logic.</p></div>
+            <div class="card"><div class="card__title">State</div><p>Redux, Zustand and other state logic.</p></div>
+            <div class="card"><div class="card__title">Handlers</div><p>Event handlers and JavaScript calculations.</p></div>
+            <div class="card"><div class="card__title">Data</div><p>Processing API responses, parsing, sorting.</p></div>
+          </div>
+
+          <p>If you block this thread with expensive synchronous work, your app can become unresponsive:</p>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>blocking.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">for</span> (<span class="tok-keyword">let</span> i = <span class="tok-type">0</span>; i &lt; <span class="tok-type">10000000000</span>; i++) {
+  <span class="tok-comment">// expensive work: taps, JS animations and updates all wait</span>
+}</code></pre>
+          </div>
+
+          <h3>The UI / main thread</h3>
+          <p>Native UI operations happen on the platform side:</p>
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">JS thread</div>
+              <div class="arrow"></div>
+              <div class="node node--ghost">state · events · commands</div>
+              <div class="arrow"></div>
+              <div class="node node--new">Native / UI side</div>
+              <div class="arrow"></div>
+              <div class="node">Android / iOS UI</div>
+            </div>
+          </figure>
+          <p>
+            If the JS thread is heavily blocked, JS-driven interactions become
+            sluggish, even though the native UI thread itself is fine. Native
+            scrolling may still work, but anything that needs JavaScript to
+            respond will wait. This is why React Native performance work often
+            focuses on keeping expensive work off the JS execution path.
+          </p>
+
+          <div class="callout callout--good">
+            <div class="callout__icon">✅</div>
+            <div>
+              <p class="callout__title">Keeping the JS thread free</p>
+              <p>
+                Run animations on the UI thread (<code>useNativeDriver</code>,
+                Reanimated), avoid needless re-renders
+                (<code>memo</code>, <code>useMemo</code>,
+                <code>useCallback</code>), virtualize long lists, split heavy
+                work into chunks, and move truly heavy computation to native
+                code.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 08 · NEW ARCHITECTURE ============ -->
+        <section class="section" id="new-architecture">
+          <div class="section__num">08</div>
+          <h2>The New Architecture changes the communication, not the threading of JS</h2>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--old">Old architecture</span>
+                <div class="node node--js">JS</div>
+                <div class="arrow"></div>
+                <div class="node node--old">Bridge<small>asynchronous, serialized messages</small></div>
+                <div class="arrow"></div>
+                <div class="node">Native</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--new">New Architecture</span>
+                <div class="node node--js">JS</div>
+                <div class="arrow"></div>
+                <div class="node node--new">JSI<small>direct references to C++ objects</small></div>
+                <div class="arrow"></div>
+                <div class="node">C++ / Native</div>
+              </div>
+            </div>
+          </figure>
+
+          <p>
+            With <strong>JSI</strong>, <strong>Fabric</strong>,
+            <strong>TurboModules</strong> and <strong>Codegen</strong>, the
+            communication model is much better than the old Bridge. See
+            <a href="index.html#new-architecture">the New Architecture</a> for
+            the details.
+          </p>
+
+          <div class="callout callout--warn">
+            <div class="callout__icon">⚠️</div>
+            <div>
+              <p class="callout__title">JSI does not make JavaScript multithreaded</p>
+              <p>
+                That's an important interview point. JSI changes how JS talks
+                to native code. Your JavaScript still runs on the JS thread,
+                one piece at a time.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 09 · MULTIPLE THREADS ============ -->
+        <section class="section" id="multiple-threads">
+          <div class="section__num">09</div>
+          <h2>Can JavaScript use multiple threads?</h2>
+          <p>
+            Yes, but not by creating another normal JS thread that shares your
+            variables. Each extra thread gets its own separate JS environment,
+            and they communicate by passing messages.
+          </p>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label">Browser</span>
+                <div class="node node--js">Main JS thread</div>
+                <div class="arrow arrow--both"></div>
+                <div class="node node--new">Web Worker<small>separate JS execution, no DOM, messages only</small></div>
+              </div>
+              <div class="flow">
+                <span class="flow__label">React Native</span>
+                <div class="node node--js">JS thread</div>
+                <div class="arrow arrow--both"></div>
+                <div class="node node--new">Native threads<small>native modules, background work, UI-thread worklets (Reanimated)</small></div>
+              </div>
+            </div>
+          </figure>
+
+          <p>
+            React Native can use native threads and specialized libraries for
+            background work, and the New Architecture involves native and C++
+            execution. But don't claim that all React Native JavaScript
+            automatically runs on multiple threads.
+          </p>
+        </section>
+
+        <!-- ============ 10 · INTERVIEW ============ -->
+        <section class="section" id="interview">
+          <div class="section__num">10</div>
+          <h2>Interview answers</h2>
+
+          <h3>"If JavaScript is single-threaded, how is it asynchronous?"</h3>
+          <blockquote class="answer">
+            <p>
+              "JavaScript execution is single-threaded, but asynchronous
+              operations are handled by the runtime environment. Operations
+              such as timers, networking, and native APIs can be handled
+              outside the JavaScript call stack. When they complete, their
+              callbacks are scheduled, and the event loop executes them when
+              the JavaScript thread is available."
+            </p>
+          </blockquote>
+
+          <h3>"Does setTimeout create a new thread?"</h3>
+          <p>No. Conceptually:</p>
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">JS registers a timer</div>
+              <div class="arrow"></div>
+              <div class="node node--ghost">Runtime handles the timer</div>
+              <div class="arrow"></div>
+              <div class="node">Timer completes → callback queued</div>
+              <div class="arrow"></div>
+              <div class="node node--new">Event loop</div>
+              <div class="arrow"></div>
+              <div class="node node--js">Same JS thread runs the callback</div>
+            </div>
+          </figure>
+
+          <h3>"Explain threading in React Native."</h3>
+          <blockquote class="answer">
+            <p>
+              "JavaScript itself executes on a JavaScript runtime and is
+              generally single-threaded, meaning one JS execution context
+              processes JavaScript work sequentially. React Native also
+              interacts with native platform threads, including the UI/main
+              thread and other native execution contexts. Asynchronous
+              operations don't necessarily block the JS thread because they're
+              handled by the runtime or native platform and their results are
+              scheduled back to JavaScript. In the old architecture,
+              communication relied heavily on the asynchronous Bridge, while
+              the New Architecture uses JSI, Fabric and TurboModules to provide
+              a more efficient interaction model."
+            </p>
+          </blockquote>
+
+          <h3>One warning</h3>
+          <div class="compare">
+            <div class="callout callout--warn">
+              <div class="callout__icon">❌</div>
+              <div>
+                <p class="callout__title">Don't say</p>
+                <p>"React Native is single-threaded." That's too simplistic.</p>
+              </div>
+            </div>
+            <div class="callout callout--good">
+              <div class="callout__icon">✅</div>
+              <div>
+                <p class="callout__title">Say</p>
+                <p>
+                  "JavaScript execution is generally single-threaded, while a
+                  React Native application can involve multiple native
+                  threads."
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 11 · QUIZ ============ -->
+        <section class="section" id="quiz-section">
+          <div class="section__num">11</div>
+          <h2>Check yourself</h2>
+          <p>Six quick questions on everything above.</p>
+          <!-- Filled by js/execution-context/quiz.js from js/event-loop/quiz-questions.js -->
+          <div class="quiz" id="quiz"></div>
+          <p class="quiz__score" id="quizScore" aria-live="polite"></p>
+        </section>
+
+        <footer class="footer">
+          JavaScript Threads &amp; Event Loop: an interactive lesson.
+          Previous topic: <a href="closures.html">JavaScript Closures</a>.
+          Next topic: <a href="ssl-security.html">SSL/TLS &amp; App Security</a>.
+          Related: <a href="index.html">React Native Architecture</a>.
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

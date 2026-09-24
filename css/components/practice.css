@@ -1,0 +1,138 @@
+/*
+ * Practice components
+ * -------------------
+ * Interactive "test yourself" pieces:
+ *   .puzzle       warm-up question with answer chips
+ *   .this-grid    code cards with a "Reveal" answer
+ *   .quiz         multiple-choice questions with feedback and a score
+ */
+
+/* ---------- Warm-up puzzle ---------- */
+
+.puzzle {
+  margin: 20px 0 8px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--mark);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.puzzle .code-block { margin: 0 0 14px; }
+.puzzle__question { margin-bottom: 10px; font-weight: 650; }
+
+.puzzle__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.puzzle__choices .btn {
+  font-family: var(--font-mono);
+  border-radius: 999px;
+}
+
+.puzzle__feedback {
+  margin: 14px 0 0;
+  font-size: 15.5px;
+  color: var(--text-muted);
+}
+.puzzle__feedback:empty { display: none; }
+
+/* Right / wrong states shared by the puzzle and the quiz */
+.btn.is-right { color: var(--exec); background: var(--exec-soft); border-color: var(--exec); }
+.btn.is-wrong { color: var(--warn); background: var(--warn-soft); border-color: var(--warn); }
+
+/* ---------- `this` cards ---------- */
+
+.this-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.this-card {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.this-card__title { margin: 0 0 10px; font-size: 1rem; }
+
+.this-card pre {
+  flex: 1;
+  margin: 0 0 12px;
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  font-variant-ligatures: none;
+  color: var(--code-text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.this-card .btn { align-self: flex-start; }
+
+.this-card__answer {
+  margin: 12px 0 0;
+  font-size: 15px;
+}
+.this-card__answer[hidden] { display: none; }
+.this-card__answer b { padding: 0 .3em; background: var(--mark-soft); border-radius: 4px; }
+
+/* ---------- Quiz ---------- */
+
+.quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.quiz__card {
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.quiz__question { margin-bottom: 10px; font-weight: 650; }
+
+.quiz__card pre {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  overflow-x: auto;
+  font-size: 13.5px;
+  font-variant-ligatures: none;
+  color: var(--code-text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.quiz__options { display: flex; flex-direction: column; gap: 6px; }
+
+.quiz__options .btn {
+  font-weight: 500;
+  text-align: left;
+  white-space: normal;
+}
+.quiz__options .btn:disabled { opacity: 1; cursor: default; }
+
+.quiz__feedback { margin: 10px 0 0; font-size: 15px; color: var(--text-muted); }
+.quiz__feedback[hidden] { display: none; }
+
+.quiz__score { font-weight: 650; }
+
+@media (max-width: 600px) {
+  .this-grid { grid-template-columns: minmax(0, 1fr); }
+}

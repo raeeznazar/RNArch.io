@@ -1,0 +1,347 @@
+/*
+ * Execution-context visualizer
+ * ----------------------------
+ * The step-through "engine" on execution-context.html. js/execution-context/visualizer.js
+ * fills the empty containers (#vizTabs, #vizCode, #vizStack, ...).
+ *
+ *   .viz-tabs         example picker
+ *   .viz              framed player
+ *     .viz__narration   phase tag + step title/text + controls
+ *     .viz__progress    one clickable bar per step
+ *     .viz__stage       code + console (left) | call stack (right)
+ *   .code-lines       numbered code with highlighted line
+ *   .console          program output
+ *   .ctx              one execution context card on the stack
+ *   .mem              a context's memory table (name → value)
+ *   .closure          memory kept alive off the stack
+ */
+
+/* ---------- Example picker ---------- */
+
+.viz-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 18px 0 14px;
+}
+
+.viz-tabs .btn[aria-selected="true"] {
+  color: var(--bg);
+  background: var(--text);
+  border-color: var(--text);
+}
+
+/* ---------- Frame ---------- */
+
+.viz {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.viz__narration {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  padding: 18px 20px 14px;
+}
+
+.viz__title {
+  margin: 6px 0 4px;
+  font-size: 1.1rem;
+}
+
+.viz__text {
+  margin: 0;
+  font-size: 15.5px;
+  color: var(--text-muted);
+}
+
+.viz__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.viz__count {
+  padding: 0 20px 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Phase tag + step bars share these colour classes */
+.phase-tag {
+  display: inline-flex;
+  padding: 2px 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+.phase-tag.creation  { color: var(--create); background: var(--create-soft); }
+.phase-tag.execution { color: var(--exec);   background: var(--exec-soft); }
+.phase-tag.error     { color: var(--warn);   background: var(--warn-soft); }
+.phase-tag.done      { color: var(--text);   background: var(--mark-soft); }
+
+.viz__progress {
+  display: flex;
+  gap: 3px;
+  padding: 0 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.viz__progress button {
+  flex: 1;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--border);
+  cursor: pointer;
+}
+.viz__progress button.creation  { background: var(--create-soft); }
+.viz__progress button.execution { background: var(--exec-soft); }
+.viz__progress button.error     { background: var(--warn-soft); }
+.viz__progress button.done      { background: var(--mark-soft); }
+.viz__progress button.is-past.creation  { background: var(--create); }
+.viz__progress button.is-past.execution { background: var(--exec); }
+.viz__progress button.is-past.error     { background: var(--warn); }
+.viz__progress button.is-past.done      { background: var(--mark); }
+
+/* ---------- Stage: two panels ---------- */
+
+.viz__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.viz__panel { padding-bottom: 14px; }
+.viz__panel + .viz__panel { border-left: 1px solid var(--border); }
+
+.viz__panel-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 14px 16px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.viz__panel-title small { font-weight: 500; }
+
+/* ---------- Numbered code ---------- */
+
+.code-lines {
+  margin: 0 12px;
+  padding: 10px 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--code-text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.code-lines__line {
+  display: flex;
+  padding-right: 14px;
+  border-left: 3px solid transparent;
+  transition: background .2s;
+}
+
+.code-lines__num {
+  flex: none;
+  width: 2.6em;
+  padding-right: 12px;
+  text-align: right;
+  color: var(--tok-comment);
+  user-select: none;
+}
+
+.code-lines__src { white-space: pre; }
+
+.code-lines__line.is-active { background: var(--mark-soft); border-left-color: var(--mark); }
+.code-lines__line.is-error  { background: var(--warn-soft); border-left-color: var(--warn); }
+
+/* ---------- Console ---------- */
+
+.console {
+  min-height: 70px;
+  margin: 0 12px;
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.console__line { padding: 2px 0; border-bottom: 1px dashed var(--border); }
+.console__line:last-child { border-bottom: 0; }
+.console__line.is-new   { background: var(--mark-soft); }
+.console__line.is-error { color: var(--warn); font-weight: 600; }
+
+.console__empty {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ---------- Call stack ---------- */
+
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 0 16px 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.viz-legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+.swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+}
+.swatch--creation  { background: var(--create); }
+.swatch--execution { background: var(--exec); }
+.swatch--tdz { background: repeating-linear-gradient(135deg, transparent 0 3px, var(--warn) 3px 6px); }
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.stack__floor {
+  margin: 10px 12px 0;
+  padding-top: 6px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-muted);
+  border-top: 3px solid var(--text);
+}
+
+/* One execution context */
+.ctx {
+  position: relative;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.ctx.is-top { border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent-soft); }
+.ctx.is-entering { animation: ctx-push .45s cubic-bezier(.2, .9, .3, 1.2); }
+.ctx.is-searched { border-style: dashed; border-color: var(--create); }
+
+@keyframes ctx-push {
+  from { opacity: 0; transform: translateY(-24px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.ctx__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ctx__name { font-weight: 700; font-size: 15px; }
+.ctx__name small { margin-left: 4px; font-size: 12px; font-weight: 500; color: var(--text-muted); }
+
+.ctx__badge {
+  padding: 1px 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+.ctx__badge.creation  { color: var(--create); background: var(--create-soft); }
+.ctx__badge.execution { color: var(--exec);   background: var(--exec-soft); }
+
+.ctx__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.ctx__meta code { font-size: 12px; }
+
+/* Memory table */
+.mem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mem__key,
+.mem__val {
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.mem__key {
+  font-weight: 600;
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+}
+.mem__key:nth-last-child(2),
+.mem__val:last-child { border-bottom: 0; }
+
+.mem__val.is-undefined { font-style: italic; color: var(--text-muted); }
+.mem__val.is-tdz {
+  color: var(--warn);
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--warn-soft) 6px 12px);
+}
+.mem__val.is-fn    { color: var(--create); }
+.mem__val.is-flash { animation: mem-flash 1.2s ease-out; }
+.mem__val.is-found { color: #14203a; background: var(--mark); }
+
+@keyframes mem-flash {
+  from { background: var(--mark); }
+  to   { background: transparent; }
+}
+
+.mem-empty { padding: 4px 0; font-size: 13px; color: var(--text-muted); }
+
+/* Closure memory, shown below the stack */
+.closure {
+  margin: 14px 12px 0;
+  padding: 12px 14px;
+  background: var(--create-soft);
+  border: 1.5px dashed var(--create);
+  border-radius: var(--radius-lg);
+}
+.closure .ctx__name { color: var(--create); }
+
+/* ---------- Responsive ---------- */
+
+@media (min-width: 720px) {
+  .viz__narration { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+}
+
+@media (max-width: 720px) {
+  .viz__stage { grid-template-columns: minmax(0, 1fr); }
+  .viz__panel + .viz__panel { border-left: 0; border-top: 1px solid var(--border); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctx.is-entering,
+  .mem__val.is-flash { animation: none; }
+}

@@ -1,0 +1,182 @@
+/*
+ * Event loop
+ * ----------
+ * Pieces used on threads.html:
+ *   .phase-tag.sync/micro/task/wait    step colours for the event-loop visualizer
+ *   .lanes                             call stack, APIs and the two queues
+ *   .lane__item                        one frame / callback in a lane
+ *   .loop-status                       what the event loop is doing
+ *   .block-demo                        "block the JS thread" playground
+ * The frame, code lines and console reuse visualizer.css.
+ */
+
+/* ---------- Step colours ---------- */
+
+.phase-tag.sync  { color: var(--exec);   background: var(--exec-soft); }
+.phase-tag.micro { color: var(--create); background: var(--create-soft); }
+.phase-tag.task  { color: var(--old);    background: var(--old-soft); }
+.phase-tag.wait  { color: var(--text-muted); background: var(--surface-2); }
+
+.viz__progress button.sync  { background: var(--exec-soft); }
+.viz__progress button.micro { background: var(--create-soft); }
+.viz__progress button.task  { background: var(--old-soft); }
+.viz__progress button.wait  { background: var(--surface-2); }
+.viz__progress button.is-past.sync  { background: var(--exec); }
+.viz__progress button.is-past.micro { background: var(--create); }
+.viz__progress button.is-past.task  { background: var(--old); }
+.viz__progress button.is-past.wait  { background: var(--text-muted); }
+
+/* ---------- Lanes ---------- */
+
+.lanes {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.lane {
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.lane__title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.lane__title small { font-weight: 500; color: var(--text-muted); }
+
+.lane__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 30px;
+}
+
+/* The call stack grows upward, so it stacks vertically */
+.lane--stack .lane__items { flex-direction: column; }
+
+.lane__item {
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.lane__item.is-top  { border-color: var(--accent); box-shadow: 3px 3px 0 var(--accent-soft); }
+.lane__item.is-flash { animation: lane-flash 1.2s ease-out; }
+
+.lane--apis  { border-style: dashed; }
+.lane--micro { border-color: color-mix(in srgb, var(--create) 45%, transparent); }
+.lane--micro .lane__item { background: var(--create-soft); }
+.lane--tasks { border-color: color-mix(in srgb, var(--old) 45%, transparent); }
+.lane--tasks .lane__item { background: var(--old-soft); }
+
+.lane__empty {
+  align-self: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@keyframes lane-flash {
+  from { background: var(--mark); }
+}
+
+.loop-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 12px 0;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--mark-soft);
+  border-radius: var(--radius);
+}
+.loop-status::before { content: "↻"; font-size: 18px; }
+
+/* ---------- Block-the-thread demo ---------- */
+
+.block-demo__tracks {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.track__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.track__label small { font-weight: 500; color: var(--text-muted); }
+
+.track__rail {
+  position: relative;
+  height: 28px;
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+
+/* The runner spans the travel distance, so translateX(100%) moves the ball
+   exactly from one end to the other. Only transform is animated, which lets
+   the browser run the CSS version off the main thread. */
+.track__runner {
+  --x: 0;
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(100% - 28px);
+  height: 20px;
+  transform: translateX(calc(var(--x) * 100%));
+}
+
+.track__ball {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.track__runner--css { animation: runner-slide 2s linear infinite; }
+.track__runner--css .track__ball { background: var(--new); }
+
+@keyframes runner-slide {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(100%); }
+}
+
+.block-demo__taps {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 16px;
+  font-size: 14.5px;
+}
+.block-demo__taps b { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+
+.block-demo__status {
+  margin-left: auto;
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--exec);
+  background: var(--exec-soft);
+  border-radius: 999px;
+}
+.block-demo.is-blocking .block-demo__status { color: var(--warn); background: var(--warn-soft); }
+
+/* ---------- Responsive ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .lane__item.is-flash { animation: none; }
+}

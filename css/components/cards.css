@@ -1,6 +1,6 @@
 /*
- * Cards, chips, the cheat sheet and the memory grid
- * -------------------------------------------------
+ * Cards, chips, cheat sheet, memory grid and phase cards
+ * -------------------------------------------------------
  * Small boxed UI pieces used for summaries.
  */
 
@@ -139,4 +139,36 @@ a.card:hover {
 
 @media (max-width: 600px) {
   .memory-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- Phase cards: two coloured boxes side by side ---------- */
+
+.phases {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.phase-card {
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid;
+}
+.phase-card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.phase-card p  { margin: 0; font-size: 15px; }
+
+.phase-card--creation  { background: var(--create-soft); border-color: var(--create); }
+.phase-card--creation h3 { color: var(--create); }
+.phase-card--execution { background: var(--exec-soft);   border-color: var(--exec); }
+.phase-card--execution h3 { color: var(--exec); }
+
+/* Four-up variant of .cards (e.g. anatomy of a context) */
+.cards--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (max-width: 900px) {
+  .cards--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .phases { grid-template-columns: minmax(0, 1fr); }
 }

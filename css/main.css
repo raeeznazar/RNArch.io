@@ -18,6 +18,23 @@
 @import url("components/answer.css");
 @import url("components/explainer.css");
 
+/* Used by execution-context.html */
+@import url("components/button.css");
+@import url("components/visualizer.css");
+@import url("components/practice.css");
+
+/* Used by closures.html */
+@import url("components/playground.css");
+
+/* Used by threads.html */
+@import url("components/event-loop.css");
+
+/* Used by ssl-security.html */
+@import url("components/security.css");
+
+/* Used by token-refresh.html */
+@import url("components/token-refresh.css");
+
 @media print {
   .sidebar { display: none; }
   .layout  { display: block; }

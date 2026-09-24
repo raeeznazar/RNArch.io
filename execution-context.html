@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JavaScript Execution Context · PrepStack</title>
+    <meta
+      name="description"
+      content="How JavaScript runs your code: execution contexts, the creation and execution phases, hoisting, the call stack, scope chain, closures and this — with a step-by-step visualizer."
+    />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+
+    <!-- Styles (css/main.css imports everything else) -->
+    <link rel="stylesheet" href="css/main.css" />
+
+    <!-- Shared site scripts -->
+    <script src="js/theme.js"></script>
+    <script src="js/sidebar.js" defer></script>
+
+    <!-- This page's scripts (order matters: helpers → data → features) -->
+    <script src="js/execution-context/highlight.js" defer></script>
+    <script src="js/execution-context/examples.js" defer></script>
+    <script src="js/execution-context/visualizer.js" defer></script>
+    <script src="js/execution-context/puzzle.js" defer></script>
+    <script src="js/execution-context/this-cards.js" defer></script>
+    <script src="js/execution-context/quiz.js" defer></script>
+  </head>
+  <body>
+    <div class="layout">
+      <!-- ============ SIDEBAR ============ -->
+      <aside class="sidebar" aria-label="Table of contents">
+        <div class="sidebar__brand">
+          <span class="sidebar__logo">⚛</span>
+          <span class="sidebar__name">
+            PrepStack
+            <small class="sidebar__tagline">Attend interviews confidently</small>
+          </span>
+          <button class="sidebar__menu-btn" type="button" aria-expanded="false">
+            Contents
+          </button>
+        </div>
+
+        <nav class="sidebar__nav">
+          <!-- Topics: keep this list identical on every page -->
+          <p class="sidebar__label">Topics</p>
+          <ul class="topics">
+            <li><a href="index.html"><span class="topics__icon">⚛</span>React Native Architecture</a></li>
+            <li><a href="execution-context.html" aria-current="page"><span class="topics__icon">JS</span>JavaScript Execution Context</a></li>
+            <li><a href="closures.html"><span class="topics__icon">JS</span>JavaScript Closures</a></li>
+            <li><a href="threads.html"><span class="topics__icon">JS</span>Threads &amp; Event Loop</a></li>
+            <li><a href="token-refresh.html"><span class="topics__icon">🔑</span>Axios Token Refresh</a></li>
+            <li><a href="ssl-security.html"><span class="topics__icon">🔒</span>SSL/TLS &amp; App Security</a></li>
+          </ul>
+
+          <p class="sidebar__label">On this page</p>
+          <ol class="toc">
+            <li><a href="#warm-up">Warm-up puzzle</a></li>
+            <li><a href="#visualizer">Watch the engine work</a></li>
+            <li><a href="#what-is">What is an execution context?</a></li>
+            <li><a href="#phases">The two phases</a></li>
+            <li><a href="#call-stack">The call stack</a></li>
+            <li><a href="#scope-chain">The scope chain</a></li>
+            <li><a href="#closures">Closures</a></li>
+            <li><a href="#this">How <code>this</code> is set</a></li>
+            <li><a href="#quiz-section">Check yourself</a></li>
+          </ol>
+          <button class="theme-toggle" type="button" data-theme-toggle>
+            ◐ Toggle theme
+          </button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <!-- ============ HERO ============ -->
+        <header class="hero">
+          <span class="hero__eyebrow">Interactive lesson</span>
+          <h1 class="hero__title">JavaScript Execution Context</h1>
+          <p class="hero__lede">
+            Before JavaScript runs a single line, it builds a place to run it.
+            That place is called an execution context. Once you can see it,
+            hoisting, scope, closures and <code>this</code> stop being magic.
+          </p>
+          <div class="chips">
+            <span class="chip">~15 min</span>
+            <span class="chip">Step-by-step visualizer</span>
+            <span class="chip">5-question quiz</span>
+          </div>
+        </header>
+
+        <!-- ============ 01 · WARM-UP PUZZLE ============ -->
+        <section class="section" id="warm-up">
+          <div class="section__num">01</div>
+          <h2>Warm-up puzzle</h2>
+          <p>Pick an answer. Most people get this wrong the first time.</p>
+
+          <div class="puzzle" id="puzzle">
+            <div class="code-block">
+              <div class="code-block__head"><span>puzzle.js</span></div>
+              <pre><code><span class="tok-fn">console</span>.<span class="tok-fn">log</span>(a);
+<span class="tok-keyword">var</span> a = <span class="tok-type">5</span>;</code></pre>
+            </div>
+            <div class="puzzle__question">What does this print?</div>
+            <div class="puzzle__choices">
+              <button class="btn" type="button" data-answer="5">5</button>
+              <button class="btn" type="button" data-answer="undefined">undefined</button>
+              <button class="btn" type="button" data-answer="error">ReferenceError</button>
+            </div>
+            <p class="puzzle__feedback" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <!-- ============ 02 · VISUALIZER ============ -->
+        <section class="section" id="visualizer">
+          <div class="section__num">02</div>
+          <h2>Watch the engine work</h2>
+          <p>
+            Pick a program, then press <strong>Next</strong> (or use your
+            <kbd>←</kbd> <kbd>→</kbd> arrow keys). The call stack shows every
+            execution context as it's created and destroyed.
+          </p>
+
+          <!-- Filled by js/execution-context/visualizer.js -->
+          <div class="viz-tabs" id="vizTabs" role="tablist"></div>
+
+          <div class="viz">
+            <div class="viz__narration">
+              <div aria-live="polite">
+                <span class="phase-tag" id="vizPhase">Creation phase</span>
+                <h3 class="viz__title" id="vizTitle"></h3>
+                <p class="viz__text" id="vizText"></p>
+              </div>
+              <div class="viz__controls">
+                <button class="btn" type="button" id="vizRestart">Restart</button>
+                <button class="btn" type="button" id="vizPrev">Back</button>
+                <button class="btn btn--primary" type="button" id="vizNext">Next</button>
+                <button class="btn" type="button" id="vizPlay">Play</button>
+              </div>
+            </div>
+            <div class="viz__count" id="vizCount"></div>
+            <div class="viz__progress" id="vizProgress"></div>
+
+            <div class="viz__stage">
+              <div class="viz__panel">
+                <div class="viz__panel-title">Code <small>highlighted = what the engine is looking at</small></div>
+                <div class="code-lines" id="vizCode"></div>
+                <div class="viz__panel-title">Console output</div>
+                <div class="console" id="vizConsole"></div>
+              </div>
+
+              <div class="viz__panel">
+                <div class="viz__panel-title">Call stack <small>newest on top</small></div>
+                <div class="viz-legend">
+                  <span><i class="swatch swatch--creation"></i>Creation phase</span>
+                  <span><i class="swatch swatch--execution"></i>Execution phase</span>
+                  <span><i class="swatch swatch--tdz"></i>Uninitialized (TDZ)</span>
+                </div>
+                <div class="stack" id="vizStack"></div>
+                <div class="stack__floor">bottom of the stack</div>
+                <div id="vizClosure"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 03 · WHAT IS AN EXECUTION CONTEXT ============ -->
+        <section class="section" id="what-is">
+          <div class="section__num">03</div>
+          <h2>What is an execution context?</h2>
+          <p>
+            Every time JavaScript runs some code, it first sets up an
+            environment for it. That environment holds everything the code
+            needs: which variables exist, what their values are, what
+            <code>this</code> means, and where to look if a variable isn't
+            found locally.
+          </p>
+          <p>There are two main kinds:</p>
+          <ul>
+            <li>
+              The <strong>Global Execution Context</strong> is created once,
+              when your script starts.
+            </li>
+            <li>
+              A <strong>Function Execution Context</strong> is created
+              <em>every single time</em> a function is called. Call the same
+              function three times and you get three separate contexts, each
+              with its own fresh variables.
+            </li>
+          </ul>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">🍳</div>
+            <div>
+              <p class="callout__title">Think of a kitchen</p>
+              <p>
+                Before cooking a recipe, a chef clears a counter, lays out
+                labelled bowls for every ingredient (still empty), and only
+                then starts cooking. The counter is the execution context. The
+                empty labelled bowls are the creation phase. Cooking is the
+                execution phase.
+              </p>
+            </div>
+          </div>
+
+          <h3>What's inside a context</h3>
+          <div class="cards cards--4">
+            <div class="card">
+              <div class="card__title">Memory</div>
+              <p>Variables and functions declared in this code. Also called the variable environment.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">Code thread</div>
+              <p>Runs the code one line at a time, top to bottom. JavaScript has only one thread.</p>
+            </div>
+            <div class="card">
+              <div class="card__title"><code>this</code></div>
+              <p>A value decided when the context is created, based on how the function was called.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">Outer reference</div>
+              <p>A link to the context where this code was written. Used to find variables that aren't local.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 04 · TWO PHASES ============ -->
+        <section class="section" id="phases">
+          <div class="section__num">04</div>
+          <h2>Every context goes through two phases</h2>
+          <p>
+            This is the single most useful thing to understand. JavaScript
+            does not simply read your file and run it. It reads it twice, in a
+            sense.
+          </p>
+
+          <div class="phases">
+            <div class="phase-card phase-card--creation">
+              <h3>1. Creation phase</h3>
+              <p>
+                The engine scans the code for declarations and reserves memory
+                for them. No code runs yet, and no values are assigned. It also
+                sets up <code>this</code> and the outer reference.
+              </p>
+            </div>
+            <div class="phase-card phase-card--execution">
+              <h3>2. Execution phase</h3>
+              <p>
+                Now the code runs line by line. Assignments fill in the real
+                values, functions get called, and output is produced.
+              </p>
+            </div>
+          </div>
+
+          <h3>Hoisting, explained</h3>
+          <p>What each declaration gets during the creation phase explains all of hoisting:</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>You wrote</th><th>Value after creation phase</th><th>Use it before the line?</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>var x = 5</code></td><td><code>undefined</code></td><td>Yes, but you get <code>undefined</code></td></tr>
+                <tr><td><code>let x</code> / <code>const x</code></td><td>Uninitialized (Temporal Dead Zone)</td><td>No, ReferenceError</td></tr>
+                <tr><td><code>function f() {}</code></td><td>The whole function</td><td>Yes, it works fully</td></tr>
+                <tr><td><code>var f = function () {}</code></td><td><code>undefined</code> (it's just a var)</td><td>Calling it gives TypeError: f is not a function</td></tr>
+                <tr><td><code>class A {}</code></td><td>Uninitialized (Temporal Dead Zone)</td><td>No, ReferenceError</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">💡</div>
+            <div>
+              <p>
+                "Hoisting" doesn't mean code physically moves to the top. It
+                means memory was set aside during the creation phase, before
+                any line ran.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 05 · CALL STACK ============ -->
+        <section class="section" id="call-stack">
+          <div class="section__num">05</div>
+          <h2>The call stack keeps track of which context is running</h2>
+          <p>
+            JavaScript can only do one thing at a time, so it needs to remember
+            where it is. It uses a stack, like a pile of plates: the last one
+            added is the first one removed.
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">Script starts<small>Global context is pushed</small></div>
+              <div class="arrow"></div>
+              <div class="node node--new">A function is called<small>new context pushed on top, now running</small></div>
+              <div class="arrow"></div>
+              <div class="node">The function returns<small>its context is popped, locals discarded</small></div>
+              <div class="arrow"></div>
+              <div class="node node--ghost">Execution continues in the context below</div>
+            </div>
+          </figure>
+
+          <p>
+            Local variables are discarded on return <em>unless a closure holds
+            on to them</em> (see <a href="#closures">Closures</a>).
+          </p>
+
+          <div class="callout callout--warn">
+            <div class="callout__icon">⚠️</div>
+            <div>
+              <p class="callout__title">Stack overflow</p>
+              <p>
+                If a function keeps calling itself without stopping, contexts
+                pile up until the engine runs out of room. That's the
+                <code>Maximum call stack size exceeded</code> error.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 06 · SCOPE CHAIN ============ -->
+        <section class="section" id="scope-chain">
+          <div class="section__num">06</div>
+          <h2>The scope chain decides where variables are found</h2>
+          <p>
+            When code uses a variable, JavaScript looks in the current
+            context's memory first. If it isn't there, it follows the outer
+            reference to the next context, and keeps going until it reaches
+            Global. If it's still not found, you get a ReferenceError.
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">inner()<small>1. look here first</small></div>
+              <div class="arrow"></div>
+              <div class="node node--js">outer()<small>2. then where inner was written</small></div>
+              <div class="arrow"></div>
+              <div class="node node--js">Global<small>3. last stop</small></div>
+              <div class="arrow"></div>
+              <div class="node node--old">Not found → ReferenceError</div>
+            </div>
+          </figure>
+
+          <p>
+            The important part: the outer reference points to where the
+            function was <strong>written</strong>, not where it was called.
+            This is called <strong>lexical scope</strong>. Try the
+            "Scope chain" example in the <a href="#visualizer">visualizer</a>
+            and watch the dashed outlines trace the lookup.
+          </p>
+        </section>
+
+        <!-- ============ 07 · CLOSURES ============ -->
+        <section class="section" id="closures">
+          <div class="section__num">07</div>
+          <h2>Closures: a function keeps its birthplace's memory</h2>
+          <p>
+            Normally a function's variables disappear when its context is
+            popped off the stack. But if an inner function that uses those
+            variables survives (for example, because it was returned),
+            JavaScript keeps those variables alive for it. That saved memory is
+            the <strong>closure</strong>.
+          </p>
+          <p>
+            This is how counters, private variables, event handlers and React
+            hooks like <code>useState</code> remember values between calls.
+            The "Closure" example in the <a href="#visualizer">visualizer</a>
+            shows the saved memory sitting outside the stack.
+          </p>
+          <p>
+            Closures get their own lesson, with private state, timers, the
+            loop trap and stale closures in React Native:
+            <a href="closures.html">JavaScript Closures</a>.
+          </p>
+        </section>
+
+        <!-- ============ 08 · THIS ============ -->
+        <section class="section" id="this">
+          <div class="section__num">08</div>
+          <h2><code>this</code> depends on how a function is called</h2>
+          <p>
+            Each context gets its own <code>this</code> during the creation
+            phase, except arrow functions, which don't create one and borrow it
+            from outside. Guess each answer, then reveal it.
+          </p>
+          <!-- Filled by js/execution-context/this-cards.js -->
+          <div class="this-grid" id="thisGrid"></div>
+        </section>
+
+        <!-- ============ 09 · QUIZ ============ -->
+        <section class="section" id="quiz-section">
+          <div class="section__num">09</div>
+          <h2>Check yourself</h2>
+          <p>
+            Five quick questions. If you can answer all of them, you understand
+            execution contexts better than most developers.
+          </p>
+          <!-- Filled by js/execution-context/quiz.js -->
+          <div class="quiz" id="quiz"></div>
+          <p class="quiz__score" id="quizScore" aria-live="polite"></p>
+
+          <h3>Quick summary</h3>
+          <blockquote class="answer">
+            <p>
+              JavaScript creates a context, fills its memory in the creation
+              phase, runs the code in the execution phase, pushes a new context
+              for every function call, pops it on return, and looks up
+              variables through the chain of places the code was written.
+            </p>
+          </blockquote>
+        </section>
+
+        <footer class="footer">
+          JavaScript Execution Context: an interactive lesson.
+          Next topic: <a href="index.html">React Native Architecture</a>.
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

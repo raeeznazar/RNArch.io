@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SSL/TLS &amp; App Security · PrepStack</title>
+    <meta
+      name="description"
+      content="SSL/TLS for React Native interviews: HTTPS, the TLS handshake, certificates and CAs, SSL pinning and certificate rotation, secure token storage, TLS vs JWT, and never shipping secrets in the app, with live demos."
+    />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+
+    <!-- Styles (css/main.css imports everything else) -->
+    <link rel="stylesheet" href="css/main.css" />
+
+    <!-- Shared site scripts -->
+    <script src="js/theme.js"></script>
+    <script src="js/sidebar.js" defer></script>
+    <script src="js/copy-code.js" defer></script>
+
+    <!-- This page's scripts. Reuses the highlighter and quiz from execution-context.
+         Order matters: helpers → data → features -->
+    <script src="js/execution-context/highlight.js" defer></script>
+    <script src="js/security/quiz-questions.js" defer></script>
+    <script src="js/execution-context/quiz.js" defer></script>
+    <script src="js/security/playgrounds.js" defer></script>
+  </head>
+  <body>
+    <div class="layout">
+      <!-- ============ SIDEBAR ============ -->
+      <aside class="sidebar" aria-label="Table of contents">
+        <div class="sidebar__brand">
+          <span class="sidebar__logo">⚛</span>
+          <span class="sidebar__name">
+            PrepStack
+            <small class="sidebar__tagline">Attend interviews confidently</small>
+          </span>
+          <button class="sidebar__menu-btn" type="button" aria-expanded="false">
+            Contents
+          </button>
+        </div>
+
+        <nav class="sidebar__nav">
+          <!-- Topics: keep this list identical on every page -->
+          <p class="sidebar__label">Topics</p>
+          <ul class="topics">
+            <li><a href="index.html"><span class="topics__icon">⚛</span>React Native Architecture</a></li>
+            <li><a href="execution-context.html"><span class="topics__icon">JS</span>JavaScript Execution Context</a></li>
+            <li><a href="closures.html"><span class="topics__icon">JS</span>JavaScript Closures</a></li>
+            <li><a href="threads.html"><span class="topics__icon">JS</span>Threads &amp; Event Loop</a></li>
+            <li><a href="token-refresh.html"><span class="topics__icon">🔑</span>Axios Token Refresh</a></li>
+            <li><a href="ssl-security.html" aria-current="page"><span class="topics__icon">🔒</span>SSL/TLS &amp; App Security</a></li>
+          </ul>
+
+          <p class="sidebar__label">On this page</p>
+          <ol class="toc">
+            <li><a href="#warm-up">Warm-up puzzle</a></li>
+            <li><a href="#what-is">What is SSL / TLS?</a></li>
+            <li><a href="#http-vs-https">HTTP vs HTTPS</a></li>
+            <li><a href="#handshake">The TLS handshake</a></li>
+            <li><a href="#certificates">Certificates &amp; CAs</a></li>
+            <li><a href="#pinning">SSL pinning</a></li>
+            <li><a href="#pinning-tradeoffs">Is pinning always needed?</a></li>
+            <li><a href="#storage">Token storage</a></li>
+            <li><a href="#tls-vs-jwt">TLS vs JWT</a></li>
+            <li><a href="#architecture">Security architecture</a></li>
+            <li><a href="#interview">Interview answers</a></li>
+            <li><a href="#quiz-section">Check yourself</a></li>
+          </ol>
+          <button class="theme-toggle" type="button" data-theme-toggle>
+            ◐ Toggle theme
+          </button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <!-- ============ HERO ============ -->
+        <header class="hero">
+          <span class="hero__eyebrow">Interview essentials</span>
+          <h1 class="hero__title">SSL/TLS &amp; App Security</h1>
+          <p class="hero__lede">
+            In React and React Native interviews, SSL comes up under API
+            security, HTTPS, certificates, token storage and network security.
+            The key is knowing what TLS protects, what it doesn't, and when
+            pinning is worth its cost.
+          </p>
+          <div class="chips">
+            <span class="chip">~20 min</span>
+            <span class="chip">Eavesdropper demo</span>
+            <span class="chip">Certificate &amp; pinning checker</span>
+            <span class="chip">6-question quiz</span>
+          </div>
+        </header>
+
+        <!-- ============ 01 · WARM-UP ============ -->
+        <section class="section" id="warm-up">
+          <div class="section__num">01</div>
+          <h2>Warm-up puzzle</h2>
+          <p>A classic interview trick question.</p>
+
+          <div class="puzzle" id="puzzle">
+            <div class="code-block">
+              <div class="code-block__head"><span>login.ts</span></div>
+              <pre><code><span class="tok-comment">// All API calls use https://</span>
+<span class="tok-keyword">const</span> { token } = <span class="tok-keyword">await</span> <span class="tok-fn">login</span>(<span class="tok-string">"https://api.example.com/login"</span>);
+
+<span class="tok-keyword">await</span> AsyncStorage.<span class="tok-fn">setItem</span>(<span class="tok-string">"token"</span>, token);</code></pre>
+            </div>
+            <div class="puzzle__question">The app uses HTTPS everywhere. Is the token stored securely?</div>
+            <div class="puzzle__choices">
+              <button class="btn" type="button" data-answer="yes">Yes, HTTPS encrypts it</button>
+              <button class="btn" type="button" data-answer="no">No, that's a separate problem</button>
+            </div>
+            <p class="puzzle__feedback" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <!-- ============ 02 · WHAT IS SSL/TLS ============ -->
+        <section class="section" id="what-is">
+          <div class="section__num">02</div>
+          <h2>What is SSL / TLS?</h2>
+          <p>
+            <strong>SSL</strong> (Secure Sockets Layer) is the older protocol
+            for securing communication between a client and a server. It's
+            deprecated. Today, <strong>TLS</strong> (Transport Layer Security,
+            versions 1.2 and 1.3) is what's actually used. People still say
+            "SSL" when they mean HTTPS/TLS.
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">Mobile app / browser</div>
+              <div class="arrow"></div>
+              <div class="node node--new">HTTPS (TLS)<small>encrypted, authenticated channel</small></div>
+              <div class="arrow"></div>
+              <div class="node">Server</div>
+            </div>
+          </figure>
+
+          <h3>The three goals</h3>
+          <div class="cards">
+            <div class="card">
+              <div class="card__title">🔐 Encryption</div>
+              <p>Others shouldn't be able to read the data.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">🪪 Authentication</div>
+              <p>The client can verify it's talking to the legitimate server.</p>
+            </div>
+            <div class="card">
+              <div class="card__title">🧾 Integrity</div>
+              <p>Data can't be modified in transit without it being detected.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 03 · HTTP VS HTTPS ============ -->
+        <section class="section" id="http-vs-https">
+          <div class="section__num">03</div>
+          <h2>HTTP vs HTTPS</h2>
+          <p>
+            <strong>HTTPS = HTTP + TLS.</strong> The HTTP request is the same;
+            TLS wraps it in an encrypted, authenticated channel.
+          </p>
+
+          <h3>Try it: you're the eavesdropper on café Wi-Fi</h3>
+          <p>Here's the same login request as someone watching the network sees it.</p>
+
+          <div class="playground" id="wire">
+            <div class="playground__bar viz-tabs" role="tablist">
+              <button class="btn" type="button" role="tab" aria-selected="true" data-mode="http">http://</button>
+              <button class="btn" type="button" role="tab" aria-selected="false" data-mode="https">https://</button>
+            </div>
+            <div class="wire__body">
+              <pre class="wire__view" data-view></pre>
+              <p class="wire__note" data-note aria-live="polite"></p>
+            </div>
+          </div>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">📱</div>
+            <div>
+              <p class="callout__title">The platforms push you to HTTPS</p>
+              <p>
+                iOS App Transport Security blocks plain HTTP by default, and
+                Android (9+) disables cleartext traffic by default. If you find
+                yourself adding exceptions for production APIs, stop and fix
+                the server instead.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 04 · HANDSHAKE ============ -->
+        <section class="section" id="handshake">
+          <div class="section__num">04</div>
+          <h2>How TLS works (interview level)</h2>
+          <p>Suppose your React Native app calls <code>https://api.example.com/login</code>. Conceptually:</p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">1. App connects<small>"Hello, I support these TLS versions and ciphers"</small></div>
+              <div class="arrow"></div>
+              <div class="node">2. Server sends its certificate<small>plus its part of the key exchange</small></div>
+              <div class="arrow"></div>
+              <div class="node node--js">3. App verifies the certificate<small>trusted CA? right hostname? not expired?</small></div>
+              <div class="arrow"></div>
+              <div class="node node--new">4. Both sides derive session keys<small>the TLS handshake is complete</small></div>
+              <div class="arrow"></div>
+              <div class="node node--new">5. Encrypted API requests / responses</div>
+            </div>
+          </figure>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">💡</div>
+            <div>
+              <p class="callout__title">Asymmetric first, then symmetric</p>
+              <p>
+                The handshake uses public-key cryptography to prove the server's
+                identity and agree on keys safely. After the handshake, the data
+                itself is encrypted with fast <strong>symmetric session
+                keys</strong>.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 05 · CERTIFICATES ============ -->
+        <section class="section" id="certificates">
+          <div class="section__num">05</div>
+          <h2>Certificates and Certificate Authorities</h2>
+          <p>A certificate is how the server proves its identity. It contains:</p>
+
+          <div class="cards cards--4">
+            <div class="card"><div class="card__title">Domain</div><p>Which hostnames it's valid for, e.g. <code>api.example.com</code>.</p></div>
+            <div class="card"><div class="card__title">Public key</div><p>The server's key, used during the handshake.</p></div>
+            <div class="card"><div class="card__title">Issuer &amp; validity</div><p>Which CA issued it, and its not-before / not-after dates.</p></div>
+            <div class="card"><div class="card__title">Signature</div><p>The CA's digital signature, so it can't be forged or edited.</p></div>
+          </div>
+
+          <p>
+            A <strong>Certificate Authority (CA)</strong> is a trusted
+            organization that issues and signs certificates, for example
+            Let's Encrypt, DigiCert or GlobalSign. Your device ships with a set
+            of trusted root certificates, and trust flows down a chain:
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--new">Root CA<small>pre-installed and trusted by the device</small></div>
+              <div class="arrow"></div>
+              <div class="node">Intermediate CA<small>signed by the root</small></div>
+              <div class="arrow"></div>
+              <div class="node node--js">Server certificate<small>signed by the intermediate</small></div>
+              <div class="arrow"></div>
+              <div class="node">api.example.com</div>
+            </div>
+          </figure>
+
+          <h3>When the client must reject the connection</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Problem</th><th>Example</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Hostname mismatch</td><td>App calls <code>api.example.com</code>, certificate is for <code>otherdomain.com</code></td></tr>
+                <tr><td>Expired certificate</td><td>The not-after date has passed</td></tr>
+                <tr><td>Untrusted certificate</td><td>Self-signed, or issued by a CA the device doesn't trust</td></tr>
+                <tr><td>Invalid chain</td><td>A missing intermediate, or a signature that doesn't verify</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>You can try each of these in the <a href="#pinning">certificate checker</a> below.</p>
+        </section>
+
+        <!-- ============ 06 · PINNING ============ -->
+        <section class="section" id="pinning">
+          <div class="section__num">06</div>
+          <h2>SSL pinning</h2>
+          <p>
+            This is probably the most React Native-specific security topic.
+            Normally the app accepts <em>any</em> valid certificate from
+            <em>any</em> CA the device trusts. With certificate or public-key
+            pinning, the app <strong>also</strong> expects a specific
+            certificate or public key.
+          </p>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label">Normal HTTPS</span>
+                <div class="node node--js">App</div>
+                <div class="arrow"></div>
+                <div class="node">Certificate validation<small>trusted CA, hostname, dates</small></div>
+                <div class="arrow"></div>
+                <div class="node node--new">Connected</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--new">With pinning</span>
+                <div class="node node--js">App<small>"I expect this server identity"</small></div>
+                <div class="arrow"></div>
+                <div class="node">Certificate validation</div>
+                <div class="arrow"></div>
+                <div class="node">Compare with the pinned value</div>
+                <div class="arrow"></div>
+                <div class="node node--new">Match → ✅ allow · No match → ❌ reject</div>
+              </div>
+            </div>
+          </figure>
+
+          <h3>Why pin?</h3>
+          <p>
+            Imagine an attacker manages to get a certificate the device trusts:
+            a compromised CA, or a rogue CA installed on a rooted or managed
+            device. Normal validation passes, and the connection is accepted.
+            Pinning asks one more question, "is this the key I expect?", and
+            rejects the impostor. That's stronger assurance of the server's
+            identity against certain man-in-the-middle attacks.
+          </p>
+
+          <h3>Try it: certificate &amp; pinning checker</h3>
+          <p>
+            Pick what the server presents and how the app pins. Try the
+            <strong>MITM</strong> scenario with pinning off and on, then try
+            <strong>Cert renewed</strong> with a pinned certificate.
+          </p>
+
+          <div class="playground cert-check" id="certCheck">
+            <div class="cert-check__controls">
+              <div class="playground__label">Server presents</div>
+              <div class="viz-tabs" role="tablist" data-scenarios>
+                <button class="btn" type="button" role="tab" aria-selected="true" data-scenario="legit">Legit server</button>
+                <button class="btn" type="button" role="tab" aria-selected="false" data-scenario="expired">Expired</button>
+                <button class="btn" type="button" role="tab" aria-selected="false" data-scenario="mismatch">Wrong domain</button>
+                <button class="btn" type="button" role="tab" aria-selected="false" data-scenario="untrusted">Self-signed</button>
+                <button class="btn" type="button" role="tab" aria-selected="false" data-scenario="mitm">MITM</button>
+                <button class="btn" type="button" role="tab" aria-selected="false" data-scenario="renewed">Cert renewed</button>
+                <button class="btn" type="button" role="tab" aria-selected="false" data-scenario="rotated">Key rotated</button>
+              </div>
+              <div class="playground__label">App pinning</div>
+              <div class="viz-tabs" role="tablist" data-pin-modes>
+                <button class="btn" type="button" role="tab" aria-selected="true" data-pin="off">Off</button>
+                <button class="btn" type="button" role="tab" aria-selected="false" data-pin="cert">Pin certificate</button>
+                <button class="btn" type="button" role="tab" aria-selected="false" data-pin="key">Pin public key + backup</button>
+              </div>
+            </div>
+
+            <p class="cert-check__story" data-story></p>
+
+            <div class="cert-check__stage">
+              <div>
+                <h4>Certificate received</h4>
+                <div data-cert></div>
+                <p class="cert-check__pins" data-pins></p>
+              </div>
+              <div>
+                <h4>Checks the app runs</h4>
+                <ul class="checks" data-checks></ul>
+              </div>
+            </div>
+            <p class="verdict" data-verdict aria-live="polite"></p>
+          </div>
+        </section>
+
+        <!-- ============ 07 · TRADE-OFFS ============ -->
+        <section class="section" id="pinning-tradeoffs">
+          <div class="section__num">07</div>
+          <h2>Is SSL pinning always necessary?</h2>
+          <p>
+            <strong>No.</strong> This is an important senior-level answer.
+            Pinning adds operational complexity, because certificates expire
+            and get replaced:
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node">Old certificate expires</div>
+              <div class="arrow"></div>
+              <div class="node node--js">Server switches to a new certificate</div>
+              <div class="arrow"></div>
+              <div class="node node--old">App only accepts the old one → rejects the real server ❌<small>every installed copy is broken until users update</small></div>
+            </div>
+          </figure>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>What you pin</th><th>Survives a certificate renewal?</th><th>Notes</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>The exact certificate</td><td>No</td><td>Breaks on every renewal (Let's Encrypt renews every ~90 days)</td></tr>
+                <tr><td>The public key (SPKI hash)</td><td>Yes, if the key pair is kept</td><td>The usual choice</td></tr>
+                <tr><td>Public key + backup pins</td><td>Yes, even when rotating keys</td><td>Keep a backup key offline and ship its pin in advance</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>On Android, pins can be declared in the Network Security Config, with backup pins and an expiry date:</p>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>android/app/src/main/res/xml/network_security_config.xml</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code>&lt;<span class="tok-keyword">network-security-config</span>&gt;
+  &lt;<span class="tok-keyword">domain-config</span>&gt;
+    &lt;<span class="tok-keyword">domain</span> includeSubdomains=<span class="tok-string">"true"</span>&gt;api.example.com&lt;/<span class="tok-keyword">domain</span>&gt;
+    &lt;<span class="tok-keyword">pin-set</span> expiration=<span class="tok-string">"2027-01-01"</span>&gt;
+      &lt;<span class="tok-keyword">pin</span> digest=<span class="tok-string">"SHA-256"</span>&gt;<span class="tok-comment">base64-of-current-public-key=</span>&lt;/<span class="tok-keyword">pin</span>&gt;
+      &lt;<span class="tok-keyword">pin</span> digest=<span class="tok-string">"SHA-256"</span>&gt;<span class="tok-comment">base64-of-backup-public-key=</span>&lt;/<span class="tok-keyword">pin</span>&gt;
+    &lt;/<span class="tok-keyword">pin-set</span>&gt;
+  &lt;/<span class="tok-keyword">domain-config</span>&gt;
+&lt;/<span class="tok-keyword">network-security-config</span>&gt;</code></pre>
+          </div>
+          <p>
+            On iOS, pinning is usually done with a library such as TrustKit or
+            a React Native pinning library that configures both platforms.
+          </p>
+
+          <div class="compare">
+            <div class="callout callout--warn">
+              <div class="callout__icon">❌</div>
+              <div>
+                <p class="callout__title">Don't say</p>
+                <p>"Every React Native app must use SSL pinning."</p>
+              </div>
+            </div>
+            <div class="callout callout--good">
+              <div class="callout__icon">✅</div>
+              <div>
+                <p class="callout__title">Say</p>
+                <p>
+                  "HTTPS/TLS should be standard for network communication.
+                  Certificate or public-key pinning can provide additional
+                  protection for higher-risk applications, but it introduces
+                  certificate rotation and maintenance considerations."
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 08 · STORAGE ============ -->
+        <section class="section" id="storage">
+          <div class="section__num">08</div>
+          <h2>HTTPS doesn't protect data stored on the phone</h2>
+          <p>
+            HTTPS protects data <strong>while it travels</strong>. Once a token
+            arrives and you save it, storage is a separate security concern:
+          </p>
+
+          <div class="cheat-sheet">
+            <div><b>Network</b><span>HTTPS / TLS</span></div>
+            <div><b>Storage</b><span>Keychain / Keystore</span></div>
+            <div><b>Authentication</b><span>who you are</span></div>
+            <div><b>Authorization</b><span>what you may do</span></div>
+          </div>
+
+          <h3>React Native token storage</h3>
+          <p>
+            For sensitive tokens, don't casually say "I'll store it in
+            AsyncStorage." AsyncStorage is ordinary, unencrypted app storage.
+            Platform-backed secure storage is generally preferable.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Storage</th><th>Encrypted?</th><th>Use it for</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>AsyncStorage</code> / MMKV (default)</td><td>No</td><td>Preferences, cache, non-sensitive state</td></tr>
+                <tr><td><code>expo-secure-store</code>, <code>react-native-keychain</code></td><td>Yes, backed by iOS Keychain / Android Keystore</td><td>Access and refresh tokens, credentials</td></tr>
+                <tr><td>Hardcoded in the JS bundle</td><td>No, extractable</td><td>Never for secrets</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">React Native</div>
+              <div class="arrow"></div>
+              <div class="node">SecureStore / Keychain library</div>
+              <div class="arrow"></div>
+              <div class="node node--new">iOS Keychain · Android Keystore-backed storage</div>
+            </div>
+          </figure>
+
+          <div class="compare">
+            <div class="code-block">
+              <div class="code-block__head"><span>❌ plain storage</span></div>
+              <pre><code><span class="tok-keyword">await</span> AsyncStorage.<span class="tok-fn">setItem</span>(
+  <span class="tok-string">"token"</span>,
+  token
+);</code></pre>
+            </div>
+            <div class="code-block">
+              <div class="code-block__head"><span>✅ secure storage (Expo)</span></div>
+              <pre><code><span class="tok-keyword">import</span> * <span class="tok-keyword">as</span> SecureStore <span class="tok-keyword">from</span> <span class="tok-string">"expo-secure-store"</span>;
+
+<span class="tok-keyword">await</span> SecureStore.<span class="tok-fn">setItemAsync</span>(<span class="tok-string">"token"</span>, token);</code></pre>
+            </div>
+          </div>
+          <p>The exact implementation depends on the platform and the library.</p>
+        </section>
+
+        <!-- ============ 09 · TLS VS JWT ============ -->
+        <section class="section" id="tls-vs-jwt">
+          <div class="section__num">09</div>
+          <h2>SSL/TLS vs JWT: don't confuse them</h2>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--new">TLS protects the connection</span>
+                <div class="node node--js">App</div>
+                <div class="arrow arrow--both"></div>
+                <div class="node node--new">encrypted channel</div>
+                <div class="arrow arrow--both"></div>
+                <div class="node">Server</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label">JWT proves who is calling</span>
+                <div class="node node--js">App</div>
+                <div class="arrow"></div>
+                <div class="node">Authorization: Bearer &lt;token&gt;</div>
+                <div class="arrow"></div>
+                <div class="node">Server checks the token</div>
+              </div>
+            </div>
+          </figure>
+
+          <p>
+            They solve different problems and usually work together:
+            <strong>HTTPS/TLS + an authentication token + secure token
+            storage</strong>. A JWT sent over plain HTTP could be stolen; TLS
+            without a token doesn't tell the server who the user is.
+          </p>
+        </section>
+
+        <!-- ============ 10 · ARCHITECTURE ============ -->
+        <section class="section" id="architecture">
+          <div class="section__num">10</div>
+          <h2>React Native security architecture</h2>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label">In the app</span>
+                <div class="node node--js">React Native app</div>
+                <div class="arrow"></div>
+                <div class="node node--new">HTTPS / TLS<small>network</small></div>
+                <div class="arrow"></div>
+                <div class="node node--new">Secure storage<small>tokens</small></div>
+                <div class="arrow"></div>
+                <div class="node node--new">Auth<small>JWT / session, short-lived access tokens</small></div>
+              </div>
+              <div class="flow">
+                <span class="flow__label">On the server</span>
+                <div class="node">API</div>
+                <div class="arrow"></div>
+                <div class="node">Authentication &amp; authorization</div>
+                <div class="arrow"></div>
+                <div class="node">Input validation</div>
+                <div class="arrow"></div>
+                <div class="node">Rate limiting</div>
+                <div class="arrow"></div>
+                <div class="node">Database security</div>
+              </div>
+            </div>
+          </figure>
+
+          <h3>Never ship secrets in the app</h3>
+          <p>
+            Anything in the JavaScript bundle or the app binary can be
+            extracted by anyone who downloads the app, including values from
+            <code>.env</code> files that get inlined at build time.
+          </p>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>config.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">const</span> STRIPE_SECRET_KEY = <span class="tok-string">"sk_live_..."</span>;   <span class="tok-comment">// ❌ extractable from the bundle</span>
+<span class="tok-keyword">const</span> DB_PASSWORD = <span class="tok-string">"..."</span>;               <span class="tok-comment">// ❌ never on the client</span>
+
+<span class="tok-comment">// ✅ The app calls your API; your server holds the secret</span>
+<span class="tok-keyword">await</span> <span class="tok-fn">fetch</span>(<span class="tok-string">"https://api.example.com/payments"</span>, {
+  method: <span class="tok-string">"POST"</span>,
+  headers: { Authorization: <span class="tok-string">`Bearer ${accessToken}`</span> },
+});</code></pre>
+          </div>
+
+          <div class="callout callout--warn">
+            <div class="callout__icon">🚫</div>
+            <div>
+              <p>
+                Never put real API secrets, private keys, database
+                credentials, or other server-side secrets inside the mobile
+                app. Obfuscation only slows attackers down.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 11 · INTERVIEW ============ -->
+        <section class="section" id="interview">
+          <div class="section__num">11</div>
+          <h2>Interview answers</h2>
+          <p>Answer each one out loud, then reveal it.</p>
+          <!-- Filled by js/security/playgrounds.js -->
+          <div class="this-grid" id="qaGrid"></div>
+
+          <h3>⭐ "How do you secure a React Native application?"</h3>
+          <blockquote class="answer">
+            <p>
+              "I would start with HTTPS/TLS for all API communication. For
+              authentication, I would use short-lived access tokens and
+              appropriate refresh-token handling, and store sensitive tokens
+              using platform-backed secure storage rather than ordinary
+              storage. On the server, I'd enforce authentication and
+              authorization, validate inputs and implement rate limiting. For
+              high-security applications, I would also consider certificate or
+              public-key pinning, while having a proper certificate rotation
+              strategy. I would also avoid hardcoding secrets in the React
+              Native bundle, because anything shipped to the client should be
+              considered potentially extractable."
+            </p>
+          </blockquote>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">🎯</div>
+            <div>
+              <p>
+                That last sentence is the one that stands out in a React Native
+                interview. It shows you understand that the client is never a
+                safe place for secrets.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 12 · QUIZ ============ -->
+        <section class="section" id="quiz-section">
+          <div class="section__num">12</div>
+          <h2>Check yourself</h2>
+          <p>Six quick questions on everything above.</p>
+          <!-- Filled by js/execution-context/quiz.js from js/security/quiz-questions.js -->
+          <div class="quiz" id="quiz"></div>
+          <p class="quiz__score" id="quizScore" aria-live="polite"></p>
+        </section>
+
+        <footer class="footer">
+          SSL/TLS &amp; App Security: an interactive lesson.
+          Previous topic: <a href="threads.html">Threads &amp; Event Loop</a>.
+          Related: <a href="index.html">React Native Architecture</a>.
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

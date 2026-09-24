@@ -1,0 +1,118 @@
+/*
+ * Playgrounds
+ * -----------
+ * Small hands-on widgets on closures.html (js/closures/playgrounds.js):
+ *   .playground         framed box: toolbar, body, console
+ *   .factory__list      one card per counter created in the counter factory
+ *   .playground__screen big value display, like a <Text> on a phone
+ * The console and memory table reuse .console and .mem from visualizer.css.
+ */
+
+.playground {
+  margin: 20px 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.playground__bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.playground__bar .btn { font-family: var(--font-mono); font-size: 13.5px; }
+
+.playground__label {
+  padding: 12px 16px 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.playground .console {
+  max-height: 180px;
+  margin: 0 16px 16px;
+  overflow-y: auto;
+}
+
+/* ---------- Counter factory ---------- */
+
+.factory__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+
+.factory__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--create-soft);
+  border: 1.5px dashed var(--create);
+  border-radius: var(--radius-lg);
+  animation: factory-in .3s ease-out;
+}
+
+.factory__name {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--create);
+}
+
+.factory__card .mem { background: var(--surface); }
+.factory__card .btn { font-family: var(--font-mono); font-size: 13.5px; }
+
+.factory__empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--text-muted);
+}
+
+@keyframes factory-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .factory__card { animation: none; }
+}
+
+/* An old render: still holds its closure, no longer on screen */
+.factory__card.is-stale {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.factory__card.is-stale .factory__name { color: var(--text-muted); }
+
+/* ---------- Fake phone screen (stale closure demo) ---------- */
+
+.playground__screen {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.playground__screen-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.playground__screen-value {
+  font-size: 2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}

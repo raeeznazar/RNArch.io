@@ -1,0 +1,116 @@
+/*
+ * Security
+ * --------
+ * Pieces used on ssl-security.html (js/security/playgrounds.js):
+ *   .wire__view     what an eavesdropper sees: plaintext vs ciphertext
+ *   .cert-check     certificate checker: certificate, pins, checks, verdict
+ *   .checks         pass / fail list
+ *   .verdict        final result banner
+ * Toggles reuse .viz-tabs, the certificate reuses .mem, frames reuse .playground.
+ */
+
+.playground .viz-tabs { margin: 0; }
+
+/* ---------- Eavesdropper view ---------- */
+
+.wire__body { padding: 16px; }
+
+.wire__view {
+  min-height: 150px;
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.7;
+  white-space: pre;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+}
+.wire__view.is-plain  { color: var(--warn); background: var(--warn-soft); border-color: var(--warn); }
+.wire__view.is-cipher { color: var(--new);  background: var(--new-soft);  border-color: var(--new); }
+
+.wire__note {
+  margin: 12px 0 0;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+/* ---------- Certificate checker ---------- */
+
+.cert-check__controls {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cert-check__controls .playground__label { padding: 0; }
+
+.cert-check__story {
+  margin: 0;
+  padding: 14px 16px 0;
+  font-size: 15px;
+}
+
+.cert-check__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.cert-check__stage h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cert-check__pins {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.checks {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14.5px;
+}
+
+.checks li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+}
+.checks li small { color: var(--text-muted); }
+
+.checks__icon { flex: none; width: 1em; font-weight: 800; text-align: center; }
+
+.checks .is-pass { background: var(--new-soft); }
+.checks .is-pass .checks__icon { color: var(--new); }
+.checks .is-fail { background: var(--warn-soft); }
+.checks .is-fail .checks__icon { color: var(--warn); }
+.checks .is-skip { color: var(--text-muted); background: var(--surface-2); }
+
+.verdict {
+  margin: 0 16px 16px;
+  padding: 12px 14px;
+  font-weight: 600;
+  border-radius: var(--radius);
+}
+.verdict.is-ok      { color: var(--new);  background: var(--new-soft); }
+.verdict.is-blocked { color: var(--text); background: var(--mark-soft); }
+.verdict.is-danger  { color: var(--warn); background: var(--warn-soft); }
+
+@media (max-width: 720px) {
+  .cert-check__stage { grid-template-columns: minmax(0, 1fr); }
+}

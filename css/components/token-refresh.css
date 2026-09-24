@@ -1,0 +1,206 @@
+/*
+ * Token refresh
+ * -------------
+ * Pieces used on token-refresh.html (js/token-refresh/playgrounds.js):
+ *   .sim            refresh simulator: settings, token store, request rows, stats
+ *   .req            one API request: name + a trail of .pill steps
+ *   .pill           one step in a request's life (sent, 401, queued, retry, 200…)
+ *   .sim-stats      refresh calls / server hits / result
+ *   .keyword-chain  the "5 keywords" row at the end of the page
+ * The frame reuses .playground, toggles reuse .viz-tabs, the store reuses .mem.
+ */
+
+/* ---------- Simulator settings ---------- */
+
+.sim__settings {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sim__setting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.sim__setting-label {
+  min-width: 118px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.sim .viz-tabs { margin: 0; }
+.sim .viz-tabs .btn { font-size: 13.5px; }
+
+/* ---------- Token store + stats ---------- */
+
+.sim__status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sim__status .mem { background: var(--surface); }
+
+.mem__val.is-expired { color: var(--warn); text-decoration: line-through; }
+.mem__val.is-fresh   { color: var(--new); font-weight: 600; }
+
+.sim-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sim-stats div {
+  padding: 8px 10px;
+  text-align: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.sim-stats b {
+  display: block;
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.sim-stats span { font-size: 12px; color: var(--text-muted); }
+
+.sim-stats .is-bad  b { color: var(--warn); }
+.sim-stats .is-good b { color: var(--new); }
+
+/* ---------- Request rows ---------- */
+
+.sim__requests {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.sim__empty {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--text-muted);
+}
+
+.req {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.req__name {
+  padding-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.req__trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Arrow between steps */
+.req__trail .pill + .pill::before {
+  content: "→";
+  margin: 0 6px 0 -1px;
+  color: var(--text-muted);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--surface-2);
+  border-radius: 999px;
+  animation: pill-in .25s ease-out;
+}
+
+.pill--401     { color: var(--warn);   background: var(--warn-soft); }
+.pill--queued  { color: var(--create); background: var(--create-soft); }
+.pill--refresh { color: #7a5a00;       background: var(--mark-soft); }
+.pill--retry   { color: var(--accent); background: var(--accent-soft); }
+.pill--ok      { color: var(--new);    background: var(--new-soft); }
+.pill--fail    { color: #fff;          background: var(--warn); }
+
+:root[data-theme="dark"] .pill--refresh { color: var(--mark); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pill--refresh { color: var(--mark); }
+}
+
+@keyframes pill-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Logged-out banner */
+.sim__banner {
+  margin: 0 16px 16px;
+  padding: 10px 14px;
+  font-weight: 600;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: var(--radius);
+}
+.sim__banner[hidden] { display: none; }
+
+/* ---------- 5 keywords ---------- */
+
+.keyword-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px 0;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.keyword-chain span {
+  padding: 6px 12px;
+  font-weight: 650;
+  background: var(--accent-soft);
+  border-radius: 8px;
+}
+
+.keyword-chain i {
+  font-style: normal;
+  color: var(--text-muted);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 720px) {
+  .sim__status { grid-template-columns: minmax(0, 1fr); }
+  .req { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill { animation: none; }
+}

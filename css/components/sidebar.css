@@ -1,7 +1,7 @@
 /*
  * Sidebar component
  * -----------------
- * Brand, table of contents and theme toggle.
+ * Brand, topic links (one per page), table of contents and theme toggle.
  * Desktop: sticky column on the left.
  * Mobile:  a card at the top; the list is hidden until "Contents" is tapped
  *          (js/sidebar.js toggles .sidebar--open).
@@ -34,6 +34,20 @@
   color: var(--accent);
 }
 
+.sidebar__name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  letter-spacing: -.01em;
+}
+
+.sidebar__tagline {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
 .sidebar__label {
   margin: 0 0 10px;
   font-size: 12px;
@@ -41,6 +55,50 @@
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--text-muted);
+}
+
+/* ---------- Topics: links between pages ---------- */
+
+.topics {
+  list-style: none;
+  margin: 0 0 26px;
+  padding: 0;
+}
+
+.topics li { margin: 0; padding: 0; }
+
+.topics a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: -10px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.topics a:hover { background: var(--surface-2); text-decoration: none; }
+
+.topics__icon {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+/* The page you're on */
+.topics a[aria-current="page"] {
+  font-weight: 650;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
 }
 
 /* Mobile-only "Contents" button */
@@ -144,6 +202,7 @@
   .sidebar__nav { display: none; padding-top: 14px; }
   .sidebar--open .sidebar__nav { display: block; }
 
-  .toc a { margin-left: 0; }
+  .toc a,
+  .topics a { margin-left: 0; }
   .theme-toggle { margin-top: 14px; }
 }

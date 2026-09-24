@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Axios Token Refresh</title>
+    <meta
+      name="description"
+      content="How to handle access-token expiration and refresh tokens with Axios interceptors: the request and response interceptors, the refresh queue for simultaneous 401s, _retry, logout, and secure storage in React Native, with a live refresh simulator."
+    />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+
+    <!-- Styles (css/main.css imports everything else) -->
+    <link rel="stylesheet" href="css/main.css" />
+
+    <!-- Shared site scripts -->
+    <script src="js/theme.js"></script>
+    <script src="js/sidebar.js" defer></script>
+    <script src="js/copy-code.js" defer></script>
+
+    <!-- This page's scripts. Reuses the helpers and quiz from execution-context.
+         Order matters: helpers → data → features -->
+    <script src="js/execution-context/highlight.js" defer></script>
+    <script src="js/token-refresh/quiz-questions.js" defer></script>
+    <script src="js/execution-context/quiz.js" defer></script>
+    <script src="js/token-refresh/playgrounds.js" defer></script>
+  </head>
+  <body>
+    <div class="layout">
+      <!-- ============ SIDEBAR ============ -->
+      <aside class="sidebar" aria-label="Table of contents">
+        <div class="sidebar__brand">
+          <span class="sidebar__logo">⚛</span>
+          RNArch.io
+          <button class="sidebar__menu-btn" type="button" aria-expanded="false">
+            Contents
+          </button>
+        </div>
+
+        <nav class="sidebar__nav">
+          <!-- Topics: keep this list identical on every page -->
+          <p class="sidebar__label">Topics</p>
+          <ul class="topics">
+            <li><a href="index.html"><span class="topics__icon">⚛</span>React Native Architecture</a></li>
+            <li><a href="execution-context.html"><span class="topics__icon">JS</span>JavaScript Execution Context</a></li>
+            <li><a href="closures.html"><span class="topics__icon">JS</span>JavaScript Closures</a></li>
+            <li><a href="threads.html"><span class="topics__icon">JS</span>Threads &amp; Event Loop</a></li>
+            <li><a href="token-refresh.html" aria-current="page"><span class="topics__icon">🔑</span>Axios Token Refresh</a></li>
+            <li><a href="ssl-security.html"><span class="topics__icon">🔒</span>SSL/TLS &amp; App Security</a></li>
+          </ul>
+
+          <p class="sidebar__label">On this page</p>
+          <ol class="toc">
+            <li><a href="#warm-up">Warm-up puzzle</a></li>
+            <li><a href="#auth-flow">Basic authentication flow</a></li>
+            <li><a href="#request-interceptor">The request interceptor</a></li>
+            <li><a href="#expired">When the token expires</a></li>
+            <li><a href="#complete-flow">The complete flow</a></li>
+            <li><a href="#multiple">Many requests at once</a></li>
+            <li><a href="#simulator">Refresh simulator</a></li>
+            <li><a href="#implementation">The implementation</a></li>
+            <li><a href="#retry">Why <code>_retry</code>?</a></li>
+            <li><a href="#refresh-expired">Refresh token expires</a></li>
+            <li><a href="#storage">Storing tokens in React Native</a></li>
+            <li><a href="#interview">Interview answers</a></li>
+            <li><a href="#memorize">Final flow to memorize</a></li>
+            <li><a href="#quiz-section">Check yourself</a></li>
+          </ol>
+          <button class="theme-toggle" type="button" data-theme-toggle>
+            ◐ Toggle theme
+          </button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <!-- ============ HERO ============ -->
+        <header class="hero">
+          <span class="hero__eyebrow">Interview essentials</span>
+          <h1 class="hero__title">Axios Token Refresh</h1>
+          <p class="hero__lede">
+            "How do you handle access-token expiration and refresh tokens in
+            Axios?" If you've worked with Axios in React or React Native, expect
+            this question. Here's the full flow, from the request interceptor to
+            the refresh queue that handles many 401s at once.
+          </p>
+          <div class="chips">
+            <span class="chip">~20 min</span>
+            <span class="chip">Live refresh simulator</span>
+            <span class="chip">6-question quiz</span>
+          </div>
+        </header>
+
+        <!-- ============ 01 · WARM-UP PUZZLE ============ -->
+        <section class="section" id="warm-up">
+          <div class="section__num">01</div>
+          <h2>Warm-up puzzle</h2>
+          <p>
+            Your response interceptor refreshes the token on every 401, with no
+            other checks. The access token has expired, and the dashboard fires
+            these four requests at the same time:
+          </p>
+
+          <div class="puzzle" id="puzzle">
+            <div class="code-block">
+              <div class="code-block__head"><span>dashboard.ts</span></div>
+              <pre><code>api.<span class="tok-fn">get</span>(<span class="tok-string">"/users"</span>);      <span class="tok-comment">// → 401</span>
+api.<span class="tok-fn">get</span>(<span class="tok-string">"/profile"</span>);    <span class="tok-comment">// → 401</span>
+api.<span class="tok-fn">get</span>(<span class="tok-string">"/orders"</span>);     <span class="tok-comment">// → 401</span>
+api.<span class="tok-fn">get</span>(<span class="tok-string">"/dashboard"</span>);  <span class="tok-comment">// → 401</span></code></pre>
+            </div>
+            <div class="puzzle__question">How many times does the app call <code>POST /auth/refresh</code>?</div>
+            <div class="puzzle__choices">
+              <button class="btn" type="button" data-answer="1">1</button>
+              <button class="btn" type="button" data-answer="4">4</button>
+              <button class="btn" type="button" data-answer="loop">Forever</button>
+            </div>
+            <p class="puzzle__feedback" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <!-- ============ 02 · BASIC AUTH FLOW ============ -->
+        <section class="section" id="auth-flow">
+          <div class="section__num">02</div>
+          <h2>Basic authentication flow</h2>
+          <p>When the user logs in, the server returns two tokens:</p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">Login<small>email + password</small></div>
+              <div class="arrow"></div>
+              <div class="node">Server</div>
+              <div class="arrow arrow--stem"></div>
+              <div class="fork"></div>
+              <div class="branch">
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new node--fluid">accessToken<small>short-lived, sent with every request</small></div>
+                </div>
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new node--fluid">refreshToken<small>long-lived, only used to get a new access token</small></div>
+                </div>
+              </div>
+            </div>
+          </figure>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>POST /auth/login → response</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code>{
+  <span class="tok-string">"accessToken"</span>: <span class="tok-string">"eyJ..."</span>,
+  <span class="tok-string">"refreshToken"</span>: <span class="tok-string">"eyJ..."</span>
+}</code></pre>
+          </div>
+
+          <p>You store them securely. Then every API request sends the access token in a header:</p>
+          <div class="code-block">
+            <div class="code-block__head"><span>HTTP header</span></div>
+            <pre><code>Authorization: Bearer ACCESS_TOKEN</code></pre>
+          </div>
+        </section>
+
+        <!-- ============ 03 · REQUEST INTERCEPTOR ============ -->
+        <section class="section" id="request-interceptor">
+          <div class="section__num">03</div>
+          <h2>The request interceptor</h2>
+          <p>Instead of adding the header by hand in every call:</p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>❌ repeated in every call</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code>axios.<span class="tok-fn">get</span>(<span class="tok-string">"/users"</span>, {
+  headers: {
+    Authorization: <span class="tok-string">`Bearer ${accessToken}`</span>
+  }
+});</code></pre>
+          </div>
+
+          <p>you create an Axios instance and attach the token once, in a request interceptor:</p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>✅ api.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">const</span> api = axios.<span class="tok-fn">create</span>({
+  baseURL: API_URL,
+});
+
+api.interceptors.request.<span class="tok-fn">use</span>(<span class="tok-keyword">async</span> (config) =&gt; {
+  <span class="tok-keyword">const</span> token = <span class="tok-keyword">await</span> <span class="tok-fn">getAccessToken</span>();
+
+  <span class="tok-keyword">if</span> (token) {
+    config.headers.Authorization = <span class="tok-string">`Bearer ${token}`</span>;
+  }
+
+  <span class="tok-keyword">return</span> config;
+});</code></pre>
+          </div>
+
+          <p>Now every request automatically gets the token:</p>
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">API request<small>GET /users</small></div>
+              <div class="arrow"></div>
+              <div class="node node--new">Axios request interceptor</div>
+              <div class="arrow"></div>
+              <div class="node">Get access token</div>
+              <div class="arrow"></div>
+              <div class="node">Add Authorization header<small>Bearer eyJhbGci...</small></div>
+              <div class="arrow"></div>
+              <div class="node node--js">Server</div>
+            </div>
+          </figure>
+        </section>
+
+        <!-- ============ 04 · TOKEN EXPIRES ============ -->
+        <section class="section" id="expired">
+          <div class="section__num">04</div>
+          <h2>When the access token expires</h2>
+          <p>
+            This is the important part. The access token has expired, and you
+            call <code>GET /users</code>. The server responds with
+            <strong>401 Unauthorized</strong>, and the <strong>response
+            interceptor</strong> catches it.
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">API request</div>
+              <div class="arrow"></div>
+              <div class="node node--old">Expired access token ❌</div>
+              <div class="arrow"></div>
+              <div class="node">Server</div>
+              <div class="arrow"></div>
+              <div class="node node--old">401 Unauthorized</div>
+              <div class="arrow"></div>
+              <div class="node node--new">Response interceptor</div>
+              <div class="arrow"></div>
+              <div class="node node--new">Refresh token</div>
+            </div>
+          </figure>
+
+          <h3>The refresh flow</h3>
+          <p>Send the refresh token to your refresh endpoint:</p>
+
+          <div class="compare">
+            <div class="code-block">
+              <div class="code-block__head"><span>POST /auth/refresh</span></div>
+              <pre><code>{
+  <span class="tok-string">"refreshToken"</span>: <span class="tok-string">"eyJ..."</span>
+}</code></pre>
+            </div>
+            <div class="code-block">
+              <div class="code-block__head"><span>Server returns</span></div>
+              <pre><code>{
+  <span class="tok-string">"accessToken"</span>: <span class="tok-string">"NEW_ACCESS_TOKEN"</span>
+}</code></pre>
+            </div>
+          </div>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--old">Old access token expired</div>
+              <div class="arrow"></div>
+              <div class="node node--js">Send refresh token</div>
+              <div class="arrow"></div>
+              <div class="node">Server</div>
+              <div class="arrow"></div>
+              <div class="node node--new">New access token</div>
+              <div class="arrow"></div>
+              <div class="node node--new">Store new token</div>
+              <div class="arrow"></div>
+              <div class="node node--js">Retry the original request</div>
+            </div>
+          </figure>
+        </section>
+
+        <!-- ============ 05 · COMPLETE FLOW ============ -->
+        <section class="section" id="complete-flow">
+          <div class="section__num">05</div>
+          <h2>The complete flow</h2>
+          <p>Memorize this:</p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">API request</div>
+              <div class="arrow"></div>
+              <div class="node node--new">Request interceptor</div>
+              <div class="arrow"></div>
+              <div class="node">Get access token</div>
+              <div class="arrow"></div>
+              <div class="node">Add Bearer token</div>
+              <div class="arrow"></div>
+              <div class="node node--js">Server</div>
+
+              <div class="arrow arrow--stem"></div>
+              <div class="fork"></div>
+              <div class="branch">
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new node--fluid">200</div>
+                  <div class="arrow"></div>
+                  <div class="node node--fluid">Return response</div>
+                </div>
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--old node--fluid">401</div>
+                  <div class="arrow"></div>
+                  <div class="node node--new node--fluid">Response interceptor</div>
+                  <div class="arrow"></div>
+                  <div class="node node--fluid">Refresh token</div>
+                  <div class="arrow arrow--stem"></div>
+                  <div class="fork fork--wide"></div>
+                  <div class="branch branch--tight">
+                    <div class="flow">
+                      <div class="arrow arrow--short"></div>
+                      <div class="node node--new node--fluid">Success</div>
+                      <div class="arrow"></div>
+                      <div class="node node--fluid">Save token</div>
+                      <div class="arrow"></div>
+                      <div class="node node--fluid">Retry request</div>
+                      <div class="arrow"></div>
+                      <div class="node node--new node--fluid">Return</div>
+                    </div>
+                    <div class="flow">
+                      <div class="arrow arrow--short"></div>
+                      <div class="node node--old node--fluid">Fail</div>
+                      <div class="arrow"></div>
+                      <div class="node node--old node--fluid">Logout</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </figure>
+        </section>
+
+        <!-- ============ 06 · MULTIPLE REQUESTS ============ -->
+        <section class="section" id="multiple">
+          <div class="section__num">06</div>
+          <h2>The hard part: many requests at once</h2>
+          <p>
+            This is where interviewers test you. The access token expires, and
+            at the same time:
+          </p>
+
+          <div class="code-block">
+            <div class="code-block__head"><span>simultaneous requests</span></div>
+            <pre><code>GET /users       → 401
+GET /profile     → 401
+GET /orders      → 401
+GET /dashboard   → 401</code></pre>
+          </div>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--old">❌ Careless</span>
+                <div class="node node--js">Request 1 → refresh</div>
+                <div class="arrow arrow--short"></div>
+                <div class="node node--js">Request 2 → refresh</div>
+                <div class="arrow arrow--short"></div>
+                <div class="node node--js">Request 3 → refresh</div>
+                <div class="arrow arrow--short"></div>
+                <div class="node node--js">Request 4 → refresh</div>
+                <div class="arrow"></div>
+                <div class="node node--old">4 refresh calls</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--new">✅ Refresh queue</span>
+                <div class="node-row">
+                  <div class="node node--js node--item">Req 1</div>
+                  <div class="node node--js node--item">Req 2</div>
+                  <div class="node node--js node--item">Req 3</div>
+                  <div class="node node--js node--item">Req 4</div>
+                </div>
+                <div class="arrow"></div>
+                <div class="node node--new">ONE refresh request</div>
+                <div class="arrow"></div>
+                <div class="node node--new">New access token</div>
+                <div class="arrow"></div>
+                <div class="node">Retry all failed requests</div>
+              </div>
+            </div>
+          </figure>
+
+          <p>
+            This is often called a <strong>refresh queue</strong> or
+            <strong>single-flight refresh</strong> pattern. It needs two pieces
+            of state:
+          </p>
+
+          <div class="phases">
+            <div class="phase-card phase-card--creation">
+              <h3><code>isRefreshing</code></h3>
+              <p>
+                <code>false</code> until the first 401. That request sets it to
+                <code>true</code> and starts the refresh. Every later 401 sees
+                <code>true</code> and waits instead of refreshing.
+              </p>
+            </div>
+            <div class="phase-card phase-card--execution">
+              <h3><code>failedQueue</code></h3>
+              <p>
+                The waiting requests. When the refresh succeeds, the queue is
+                processed: every request is retried with the new token.
+              </p>
+            </div>
+          </div>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">Request</div>
+              <div class="arrow"></div>
+              <div class="node node--old">401</div>
+              <div class="arrow"></div>
+              <div class="node">Is a refresh already running?</div>
+              <div class="arrow arrow--stem"></div>
+              <div class="fork"></div>
+              <div class="branch">
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new node--fluid">Yes<small>put the request in the queue</small></div>
+                </div>
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new node--fluid">No<small>set isRefreshing, start the refresh</small></div>
+                </div>
+              </div>
+              <div class="join"></div>
+              <div class="arrow arrow--short"></div>
+              <div class="node node--new">New token → process queue → retry requests</div>
+            </div>
+          </figure>
+        </section>
+
+        <!-- ============ 07 · SIMULATOR ============ -->
+        <section class="section" id="simulator">
+          <div class="section__num">07</div>
+          <h2>Try it: refresh simulator</h2>
+          <p>
+            This runs the interceptor logic from this page with real promises
+            against a fake server. The stored access token has already expired.
+            Press <strong>Fire 4 requests at once</strong> with the naive
+            interceptor, then switch to the refresh queue and compare the
+            <strong>refresh calls</strong> counter. Then set the refresh token
+            to <strong>Expired</strong> to see the logout path.
+          </p>
+
+          <div class="playground sim" id="refreshSim">
+            <div class="sim__settings">
+              <div class="sim__setting">
+                <span class="sim__setting-label">Interceptor</span>
+                <div class="viz-tabs" data-mode-group role="tablist">
+                  <button class="btn" type="button" role="tab" data-mode="naive" aria-selected="true">Naive: refresh on every 401</button>
+                  <button class="btn" type="button" role="tab" data-mode="queue" aria-selected="false">Refresh queue</button>
+                </div>
+              </div>
+              <div class="sim__setting">
+                <span class="sim__setting-label">Refresh token</span>
+                <div class="viz-tabs" data-refresh-group role="tablist">
+                  <button class="btn" type="button" role="tab" data-refresh="valid" aria-selected="true">Valid</button>
+                  <button class="btn" type="button" role="tab" data-refresh="expired" aria-selected="false">Expired</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="playground__bar">
+              <button class="btn btn--primary" type="button" data-fire-all>Fire 4 requests at once</button>
+              <button class="btn" type="button" data-fire-one>Fire 1 request</button>
+              <button class="btn" type="button" data-expire>Expire access token</button>
+              <button class="btn" type="button" data-reset>Reset</button>
+            </div>
+
+            <div class="sim__status">
+              <div>
+                <div class="playground__label">Token store</div>
+                <div class="mem" data-store></div>
+              </div>
+              <div>
+                <div class="playground__label">Result</div>
+                <div class="sim-stats" data-stats></div>
+              </div>
+            </div>
+
+            <div class="playground__label">Requests</div>
+            <div class="sim__requests" data-requests></div>
+            <div class="sim__banner" data-banner hidden>🔒 Logged out: authentication cleared, navigating to Login.</div>
+
+            <div class="playground__label">Network log</div>
+            <div class="console" aria-live="polite"></div>
+          </div>
+
+          <p>What you should see:</p>
+          <ul>
+            <li><strong>Naive:</strong> 4 requests → 4 refresh calls. Everything eventually works, but three refreshes were wasted.</li>
+            <li><strong>Refresh queue:</strong> the first 401 refreshes; the other three show <em>queued</em> and retry with the same new token. 1 refresh call.</li>
+            <li><strong>Refresh token expired:</strong> the refresh fails, the queued requests are rejected, and the user is logged out. With the naive interceptor, logout runs four times.</li>
+          </ul>
+        </section>
+
+        <!-- ============ 08 · IMPLEMENTATION ============ -->
+        <section class="section" id="implementation">
+          <div class="section__num">08</div>
+          <h2>The Axios implementation</h2>
+          <p>
+            Here's the pattern to understand for an interview. You don't need
+            to memorize every line: understand the architecture.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>refreshQueue.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">let</span> isRefreshing = <span class="tok-keyword">false</span>;
+<span class="tok-keyword">let</span> failedQueue = [];
+
+<span class="tok-keyword">const</span> processQueue = (error, token = <span class="tok-keyword">null</span>) =&gt; {
+  failedQueue.<span class="tok-fn">forEach</span>(({ resolve, reject }) =&gt; {
+    <span class="tok-keyword">if</span> (error) {
+      <span class="tok-fn">reject</span>(error);
+    } <span class="tok-keyword">else</span> {
+      <span class="tok-fn">resolve</span>(token);
+    }
+  });
+
+  failedQueue = [];
+};</code></pre>
+          </div>
+
+          <p>The response interceptor:</p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>api.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code>api.interceptors.response.<span class="tok-fn">use</span>(
+  response =&gt; response,
+
+  <span class="tok-keyword">async</span> error =&gt; {
+    <span class="tok-keyword">const</span> originalRequest = error.config;
+
+    <span class="tok-comment">// 1. Only handle 401s</span>
+    <span class="tok-keyword">if</span> (error.response?.status !== <span class="tok-type">401</span>) {
+      <span class="tok-keyword">return</span> <span class="tok-fn">Promise</span>.<span class="tok-fn">reject</span>(error);
+    }
+
+    <span class="tok-comment">// 2. Already retried once? Don't loop</span>
+    <span class="tok-keyword">if</span> (originalRequest._retry) {
+      <span class="tok-keyword">return</span> <span class="tok-fn">Promise</span>.<span class="tok-fn">reject</span>(error);
+    }
+
+    originalRequest._retry = <span class="tok-keyword">true</span>;
+
+    <span class="tok-comment">// 3. A refresh is already running: wait in the queue</span>
+    <span class="tok-keyword">if</span> (isRefreshing) {
+      <span class="tok-keyword">return</span> <span class="tok-keyword">new</span> <span class="tok-fn">Promise</span>((resolve, reject) =&gt; {
+        failedQueue.<span class="tok-fn">push</span>({
+          resolve,
+          reject
+        });
+      }).<span class="tok-fn">then</span>(token =&gt; {
+        originalRequest.headers.Authorization =
+          <span class="tok-string">`Bearer ${token}`</span>;
+
+        <span class="tok-keyword">return</span> <span class="tok-fn">api</span>(originalRequest);
+      });
+    }
+
+    <span class="tok-comment">// 4. First 401: this request does the refresh</span>
+    isRefreshing = <span class="tok-keyword">true</span>;
+
+    <span class="tok-keyword">try</span> {
+      <span class="tok-keyword">const</span> newToken = <span class="tok-keyword">await</span> <span class="tok-fn">refreshAccessToken</span>();
+
+      <span class="tok-fn">processQueue</span>(<span class="tok-keyword">null</span>, newToken);
+
+      originalRequest.headers.Authorization =
+        <span class="tok-string">`Bearer ${newToken}`</span>;
+
+      <span class="tok-keyword">return</span> <span class="tok-fn">api</span>(originalRequest);
+
+    } <span class="tok-keyword">catch</span> (refreshError) {
+
+      <span class="tok-fn">processQueue</span>(refreshError);
+
+      <span class="tok-comment">// logout user</span>
+
+      <span class="tok-keyword">return</span> <span class="tok-fn">Promise</span>.<span class="tok-fn">reject</span>(refreshError);
+
+    } <span class="tok-keyword">finally</span> {
+      isRefreshing = <span class="tok-keyword">false</span>;
+    }
+  }
+);</code></pre>
+          </div>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">💡</div>
+            <div>
+              <p class="callout__title">Call the refresh endpoint without the interceptor</p>
+              <p>
+                Make <code>refreshAccessToken()</code> use plain
+                <code>axios</code> or a separate instance, not
+                <code>api</code>. Otherwise a 401 from
+                <code>/auth/refresh</code> itself goes back through this
+                interceptor, which is waiting on that very refresh.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">🔁</div>
+            <div>
+              <p class="callout__title">A shorter variant: share the refresh promise</p>
+              <p>
+                Instead of a flag plus a queue, you can store the in-flight
+                refresh as a promise, e.g. <code>refreshPromise ??=
+                refreshAccessToken()</code>. Every 401 awaits the same promise,
+                and you clear it when it settles. Same single-flight idea.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 09 · WHY _RETRY ============ -->
+        <section class="section" id="retry">
+          <div class="section__num">09</div>
+          <h2>Why <code>_retry</code>?</h2>
+          <p>This is another important detail. Without it, you can create an infinite loop:</p>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--old">Without _retry</span>
+                <div class="node node--js">Request</div>
+                <div class="arrow"></div>
+                <div class="node node--old">401</div>
+                <div class="arrow"></div>
+                <div class="node">Refresh</div>
+                <div class="arrow"></div>
+                <div class="node">Retry</div>
+                <div class="arrow"></div>
+                <div class="node node--old">401 again</div>
+                <div class="arrow"></div>
+                <div class="node">Refresh → Retry → 401…</div>
+                <div class="arrow"></div>
+                <div class="node node--old">Infinite loop</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--new">With _retry</span>
+                <div class="node node--js">Retried request</div>
+                <div class="arrow"></div>
+                <div class="node node--old">401</div>
+                <div class="arrow"></div>
+                <div class="node">Already retried?</div>
+                <div class="arrow"></div>
+                <div class="node node--new">Yes</div>
+                <div class="arrow"></div>
+                <div class="node">Don't refresh again</div>
+                <div class="arrow"></div>
+                <div class="node node--new">Logout / reject</div>
+              </div>
+            </div>
+          </figure>
+
+          <p>So before refreshing, we mark the request:</p>
+          <div class="code-block">
+            <div class="code-block__head"><span>api.ts</span></div>
+            <pre><code>originalRequest._retry = <span class="tok-keyword">true</span>;</code></pre>
+          </div>
+        </section>
+
+        <!-- ============ 10 · REFRESH TOKEN EXPIRES ============ -->
+        <section class="section" id="refresh-expired">
+          <div class="section__num">10</div>
+          <h2>When the refresh token itself expires</h2>
+          <p>Eventually both tokens expire:</p>
+
+          <div class="cheat-sheet">
+            <div><b>Access token</b><span>expired</span></div>
+            <div><b>Refresh token</b><span>expired</span></div>
+            <div><b>Refresh</b><span>fails</span></div>
+            <div><b>Result</b><span>log out</span></div>
+          </div>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">API request</div>
+              <div class="arrow"></div>
+              <div class="node node--old">401</div>
+              <div class="arrow"></div>
+              <div class="node">Refresh</div>
+              <div class="arrow"></div>
+              <div class="node node--old">Refresh token invalid → refresh fails</div>
+              <div class="arrow"></div>
+              <div class="node">Clear authentication</div>
+              <div class="arrow"></div>
+              <div class="node">Logout</div>
+              <div class="arrow"></div>
+              <div class="node node--new">Navigate to Login</div>
+            </div>
+            <figcaption class="diagram__caption">That's the correct end state. Set the refresh token to <a href="#simulator">Expired in the simulator</a> to see it.</figcaption>
+          </figure>
+        </section>
+
+        <!-- ============ 11 · STORAGE ============ -->
+        <section class="section" id="storage">
+          <div class="section__num">11</div>
+          <h2>Storing tokens in React Native</h2>
+          <p>With React Native or Expo, a common setup is:</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Token</th><th>Where</th><th>Why</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Access token</td><td>Memory and/or secure storage</td><td>Short-lived, read on every request</td></tr>
+                <tr><td>Refresh token</td><td>Secure storage</td><td>Long-lived: whoever has it can get new access tokens</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>For example, Expo provides <strong>SecureStore</strong>:</p>
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>tokens.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">import</span> * <span class="tok-keyword">as</span> SecureStore <span class="tok-keyword">from</span> <span class="tok-string">"expo-secure-store"</span>;
+
+<span class="tok-keyword">await</span> SecureStore.<span class="tok-fn">setItemAsync</span>(<span class="tok-string">"refreshToken"</span>, refreshToken);
+<span class="tok-keyword">const</span> token = <span class="tok-keyword">await</span> SecureStore.<span class="tok-fn">getItemAsync</span>(<span class="tok-string">"refreshToken"</span>);</code></pre>
+          </div>
+
+          <div class="callout callout--warn">
+            <div class="callout__icon">⚠️</div>
+            <div>
+              <p>
+                <code>AsyncStorage</code> is not encrypted, so don't keep
+                tokens there. SecureStore uses the iOS Keychain and Android
+                Keystore. The exact strategy depends on your security
+                requirements and architecture.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 12 · INTERVIEW ============ -->
+        <section class="section" id="interview">
+          <div class="section__num">12</div>
+          <h2>Interview answers</h2>
+
+          <h3>"Why use an interceptor?"</h3>
+          <blockquote class="answer">
+            <p>
+              "An interceptor centralizes authentication logic. Instead of
+              manually attaching the access token to every request and handling
+              401 responses in every API call, I can use a request interceptor
+              to attach the token and a response interceptor to handle token
+              expiration, refresh the token, and retry the failed request."
+            </p>
+          </blockquote>
+
+          <h3>"What if 10 requests receive 401 simultaneously?"</h3>
+          <blockquote class="answer">
+            <p>
+              "I don't want to send 10 refresh requests. I use a single refresh
+              operation controlled by an <strong>isRefreshing</strong> flag or
+              promise, and queue the failed requests while the refresh is
+              running. Once the refresh succeeds, I update the token and retry
+              the queued requests. If refresh fails, I reject the queued
+              requests and log the user out."
+            </p>
+          </blockquote>
+        </section>
+
+        <!-- ============ 13 · FINAL FLOW ============ -->
+        <section class="section" id="memorize">
+          <div class="section__num">13</div>
+          <h2>⭐ Final flow to memorize</h2>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">API request</div>
+              <div class="arrow"></div>
+              <div class="node node--new">Request interceptor</div>
+              <div class="arrow"></div>
+              <div class="node">Add access token</div>
+              <div class="arrow"></div>
+              <div class="node node--js">Server</div>
+
+              <div class="arrow arrow--stem"></div>
+              <div class="fork"></div>
+              <div class="branch">
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new node--fluid">200</div>
+                  <div class="arrow"></div>
+                  <div class="node node--fluid">Done</div>
+                </div>
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--old node--fluid">401</div>
+                  <div class="arrow"></div>
+                  <div class="node node--fluid">Refresh running?</div>
+                  <div class="arrow arrow--stem"></div>
+                  <div class="fork fork--wide"></div>
+                  <div class="branch branch--tight">
+                    <div class="flow">
+                      <div class="arrow arrow--short"></div>
+                      <div class="node node--new node--fluid">Yes</div>
+                      <div class="arrow"></div>
+                      <div class="node node--fluid">Queue</div>
+                    </div>
+                    <div class="flow">
+                      <div class="arrow arrow--short"></div>
+                      <div class="node node--new node--fluid">No</div>
+                      <div class="arrow"></div>
+                      <div class="node node--fluid">Start refresh</div>
+                      <div class="arrow"></div>
+                      <div class="node node--fluid">Get new token</div>
+                      <div class="arrow"></div>
+                      <div class="node node--fluid">Save new token</div>
+                      <div class="arrow"></div>
+                      <div class="node node--fluid">Process queue</div>
+                      <div class="arrow"></div>
+                      <div class="node node--fluid">Retry original request</div>
+                      <div class="arrow"></div>
+                      <div class="node node--new node--fluid">Done</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </figure>
+
+          <h3>The 5 keywords to remember</h3>
+          <div class="keyword-chain">
+            <span>Request interceptor</span><i>→</i>
+            <span>Access token</span><i>→</i>
+            <span>401</span><i>→</i>
+            <span>Refresh queue</span><i>→</i>
+            <span>Retry</span>
+          </div>
+        </section>
+
+        <!-- ============ 14 · QUIZ ============ -->
+        <section class="section" id="quiz-section">
+          <div class="section__num">14</div>
+          <h2>Check yourself</h2>
+          <p>Six quick questions on everything above.</p>
+          <!-- Filled by js/execution-context/quiz.js from js/token-refresh/quiz-questions.js -->
+          <div class="quiz" id="quiz"></div>
+          <p class="quiz__score" id="quizScore" aria-live="polite"></p>
+        </section>
+
+        <footer class="footer">
+          Axios Token Refresh: interview essentials.
+          Previous topic: <a href="threads.html">Threads &amp; Event Loop</a>.
+          Related: <a href="closures.html">JavaScript Closures</a> (the queue's
+          <code>resolve</code> functions are closures).
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>
