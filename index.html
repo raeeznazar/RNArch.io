@@ -1,865 +1,955 @@
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>RN Architecture</title><style>
-/* cspell:disable-file */
-/* webkit printing magic: print all background colors */
-html {
-	-webkit-print-color-adjust: exact;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>React Native Architecture</title>
+<meta name="description" content="A structured guide to React Native's architecture: the old Bridge, the New Architecture (JSI, Fabric, TurboModules, Codegen), performance tips and a one-minute interview answer.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --text: #1f2328;
+  --text-muted: #57606a;
+  --border: #e4e6ea;
+  --accent: #0a7ea4;
+  --accent-soft: #e3f4fa;
+  --old: #b54708;
+  --old-soft: #fef3e7;
+  --new: #067647;
+  --new-soft: #e7f6ee;
+  --warn: #b42318;
+  --warn-soft: #fdecea;
+  --code-bg: #f6f8fa;
+  --code-text: #24292f;
+  --tok-key: #cf222e;
+  --tok-type: #8250df;
+  --tok-str: #0a3069;
+  --tok-com: #6e7781;
+  --tok-fn: #0550ae;
+  --shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
 }
-* {
-	box-sizing: border-box;
-	-webkit-print-color-adjust: exact;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115;
+    --surface: #161a20;
+    --surface-2: #1d222a;
+    --text: #e6e8eb;
+    --text-muted: #9aa4b2;
+    --border: #2a313b;
+    --accent: #4cc2e8;
+    --accent-soft: #10303b;
+    --old: #f5a35c;
+    --old-soft: #33230f;
+    --new: #4fd18b;
+    --new-soft: #10301f;
+    --warn: #ff8a80;
+    --warn-soft: #3a1714;
+    --code-bg: #12161c;
+    --code-text: #d6dde6;
+    --tok-key: #ff7b72;
+    --tok-type: #d2a8ff;
+    --tok-str: #a5d6ff;
+    --tok-com: #8b949e;
+    --tok-fn: #79c0ff;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --surface: #161a20;
+  --surface-2: #1d222a;
+  --text: #e6e8eb;
+  --text-muted: #9aa4b2;
+  --border: #2a313b;
+  --accent: #4cc2e8;
+  --accent-soft: #10303b;
+  --old: #f5a35c;
+  --old-soft: #33230f;
+  --new: #4fd18b;
+  --new-soft: #10301f;
+  --warn: #ff8a80;
+  --warn-soft: #3a1714;
+  --code-bg: #12161c;
+  --code-text: #d6dde6;
+  --tok-key: #ff7b72;
+  --tok-type: #d2a8ff;
+  --tok-str: #a5d6ff;
+  --tok-com: #8b949e;
+  --tok-fn: #79c0ff;
+  --shadow: none;
 }
 
-html,
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
 body {
-	margin: 0;
-	padding: 0;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
-@media only screen {
-	body {
-		margin: 2em auto;
-		max-width: 900px;
-		color: rgb(55, 53, 47);
-	}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace; }
+
+/* ---------- Layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 56px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 40px 0 32px;
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: 15px; letter-spacing: -.01em;
+  margin-bottom: 28px; color: var(--text);
+}
+.brand-mark {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.toc-label {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--text-muted); margin: 0 0 10px;
+}
+.toc { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+.toc li { counter-increment: toc; }
+.toc a {
+  display: flex; gap: 10px;
+  padding: 6px 10px; margin-left: -10px;
+  border-radius: 6px;
+  font-size: 14.5px; line-height: 1.45;
+  color: var(--text-muted);
+  border-left: 2px solid transparent;
+}
+.toc a::before {
+  content: counter(toc, decimal-leading-zero);
+  font-family: "JetBrains Mono", monospace; font-size: 12px;
+  padding-top: 2px; opacity: .7;
+}
+.toc a:hover { color: var(--text); background: var(--surface-2); text-decoration: none; }
+.toc a.active { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.theme-toggle {
+  margin-top: 28px;
+  display: inline-flex; align-items: center; gap: 8px;
+  font: inherit; font-size: 13.5px; color: var(--text-muted);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 12px; cursor: pointer;
+}
+.theme-toggle:hover { color: var(--text); }
+
+main { padding: 56px 0 96px; min-width: 0; max-width: 760px; }
+
+/* ---------- Hero ---------- */
+.eyebrow {
+  display: inline-block;
+  font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--accent); background: var(--accent-soft);
+  padding: 4px 10px; border-radius: 999px;
+}
+h1.title {
+  font-size: clamp(2.1rem, 4.5vw, 2.9rem);
+  line-height: 1.12; letter-spacing: -.025em; font-weight: 800;
+  margin: 18px 0 16px;
+}
+.lede { font-size: 1.15rem; color: var(--text-muted); margin: 0 0 28px; max-width: 640px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.chip {
+  font-size: 13px; font-weight: 500;
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 999px; padding: 3px 11px; color: var(--text-muted);
 }
 
-body {
-	line-height: 1.5;
-	white-space: pre-wrap;
+/* ---------- Sections ---------- */
+section { padding-top: 56px; }
+section + section { border-top: 1px solid var(--border); margin-top: 56px; }
+.sec-num {
+  font-family: "JetBrains Mono", monospace; font-size: 13px; font-weight: 600;
+  color: var(--accent); letter-spacing: .04em;
 }
-
-a,
-a.visited {
-	color: inherit;
-	text-decoration: underline;
-}
-
-.pdf-relative-link-path {
-	font-size: 80%;
-	color: #444;
-}
-
-h1,
-h2,
-h3 {
-	letter-spacing: -0.01em;
-	line-height: 1.2;
-	font-weight: 600;
-	margin-bottom: 0;
-}
-
-/* Override strong tags inside headings to maintain consistent weight */
-h1 strong,
-h2 strong,
-h3 strong {
-	font-weight: 600;
-}
-
-.page-title {
-	font-size: 2.5rem;
-	font-weight: 700;
-	margin-top: 0;
-	margin-bottom: 0.75em;
-}
-
-h1 {
-	font-size: 1.875rem;
-	margin-top: 1.875rem;
-}
-
 h2 {
-	font-size: 1.5rem;
-	margin-top: 1.5rem;
+  font-size: 1.85rem; line-height: 1.25; letter-spacing: -.02em; font-weight: 700;
+  margin: 6px 0 16px;
 }
-
 h3 {
-	font-size: 1.25rem;
-	margin-top: 1.25rem;
-}
-
-.source {
-	border: 1px solid #ddd;
-	border-radius: 3px;
-	padding: 1.5em;
-	word-break: break-all;
-}
-
-.callout {
-	border-radius: 10px;
-	padding: 1rem;
-	/* Paint a complete callout box on every PDF page fragment. */
-	-webkit-box-decoration-break: clone;
-	box-decoration-break: clone;
-}
-
-/* For default-background callouts, render the border outline. */
-.callout.block-color-default_background {
-	border: 1px solid rgba(55, 53, 47, 0.09);
-}
-
-figure {
-	margin: 1.25em 0;
-	page-break-inside: avoid;
-}
-
-/*
- * Toggles and callouts hold arbitrary content, so they can easily be taller
- * than a page. They must stay breakable: avoiding breaks inside them makes
- * Chromium push the whole block onto the next page, which leaves the previous
- * page mostly empty before every long toggle.
- */
-details,
-aside {
-	margin: 1.25em 0;
-}
-
-/* Keep a toggle's title on the same page as the start of its content. */
-summary {
-	page-break-after: avoid;
-	break-after: avoid;
-}
-
-/*
- * Toggle headings render as <h1/h2/h3 style="display:inline-block"> inside
- * <summary>. Without this reset, the heading's margin-top pushes it below the
- * ::marker (▼), so the triangle and the title appear on separate lines.
- */
-summary h1,
-summary h2,
-summary h3,
-summary h4 {
-	margin-top: 0;
-}
-
-figcaption {
-	opacity: 0.5;
-	font-size: 85%;
-	margin-top: 0.5em;
-}
-
-mark {
-	background-color: transparent;
-}
-
-.indented {
-	padding-left: 1.5em;
-}
-
-hr {
-	background: transparent;
-	display: block;
-	width: 100%;
-	height: 1px;
-	visibility: visible;
-	border: none;
-	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
-}
-
-img {
-	max-width: 100%;
-}
-
-@media only print {
-	img {
-		max-height: 100vh;
-		object-fit: contain;
-	}
-
-	table.collection-content {
-		width: 100%;
-		table-layout: fixed;
-	}
-
-	table.collection-content th,
-	table.collection-content td {
-		overflow-wrap: anywhere;
-	}
-
-	table.collection-content td > .user,
-	table.collection-content td > time {
-		white-space: pre-wrap;
-	}
-}
-
-@page {
-	margin: 1in;
-}
-
-.collection-content-wrapper {
-	overflow-x: auto;
-}
-
-@media only print {
-	.collection-content-wrapper {
-		overflow-x: visible;
-	}
-}
-
-.collection-content {
-	font-size: 0.875rem;
-}
-
-.collection-content td {
-	white-space: pre-wrap;
-	word-break: break-word;
-}
-
-.column-list {
-	display: flex;
-	gap: 46px;
-}
-
-.column {
-	min-width: 0;
-	overflow: hidden;
-}
-
-.column > *:first-child {
-	margin-top: 0;
-}
-
-.table_of_contents-item {
-	display: block;
-	font-size: 0.875rem;
-	line-height: 1.3;
-	padding-inline: 0.125rem;
-	padding-block: 0.375rem;
-}
-
-.table_of_contents-indent-1 {
-	margin-left: 1.5rem;
-}
-
-.table_of_contents-indent-2 {
-	margin-left: 3rem;
-}
-
-.table_of_contents-indent-3 {
-	margin-left: 4.5rem;
-}
-
-.table_of_contents-link {
-	text-decoration: none;
-	opacity: 0.7;
-	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
-}
-
-table,
-th,
-td {
-	border: 1px solid rgba(55, 53, 47, 0.09);
-}
-
-table {
-	border-collapse: collapse;
-	border-left: none;
-	border-right: none;
-}
-
-th,
-td {
-	font-weight: normal;
-	padding: 0.25em 0.5em;
-	line-height: 1.5;
-	min-height: 1.5em;
-	text-align: left;
-}
-
-th {
-	color: rgba(55, 53, 47, 0.6);
-}
-
-ol,
-ul {
-	margin: 0;
-	margin-block-start: 0.6em;
-	margin-block-end: 0.6em;
-}
-
-li > ol:first-child,
-li > ul:first-child {
-	margin-block-start: 0.6em;
-}
-
-ul > li {
-	list-style: disc;
-}
-
-ul.to-do-list {
-	padding-inline-start: 0;
-}
-
-ul.to-do-list > li {
-	list-style: none;
-}
-
-.to-do-children-checked {
-	text-decoration: line-through;
-	opacity: 0.375;
-}
-
-ul.toggle > li {
-	list-style: none;
-}
-
-ul {
-	padding-inline-start: 1.7em;
-}
-
-ul > li {
-	padding-left: 0.1em;
-}
-
-ol {
-	padding-inline-start: 1.6em;
-}
-
-ol.numbered-list.numbered-list-digits-2 {
-	padding-inline-start: 2em;
-}
-
-ol.numbered-list.numbered-list-digits-3plus {
-	padding-inline-start: 2.4em;
-}
-
-ol > li {
-	padding-left: 0.2em;
-}
-
-.mono ol {
-	padding-inline-start: 2em;
-}
-
-.mono ol > li {
-	text-indent: -0.4em;
-}
-
-.toggle {
-	padding-inline-start: 0em;
-	list-style-type: none;
-}
-
-/* Indent toggle children */
-.toggle > li > details {
-	padding-left: 1.7em;
-}
-
-.toggle > li > details > summary {
-	margin-left: -1.1em;
-}
-
-.selected-value {
-	display: inline-block;
-	padding: 0 0.5em;
-	background: rgba(206, 205, 202, 0.5);
-	border-radius: 3px;
-	margin-right: 0.5em;
-	margin-top: 0.3em;
-	margin-bottom: 0.3em;
-	white-space: nowrap;
-}
-
-.collection-title {
-	display: inline-block;
-	margin-right: 1em;
-}
-
-.page-description {
-	margin-bottom: 2em;
-}
-
-.simple-table {
-	margin-top: 1em;
-	font-size: 0.875rem;
-	empty-cells: show;
-}
-.simple-table td {
-	height: 29px;
-	min-width: 120px;
-}
-
-.simple-table th {
-	height: 29px;
-	min-width: 120px;
-}
-
-.simple-table-header-color {
-	background: rgb(247, 246, 243);
-	color: black;
-}
-.simple-table-header {
-	font-weight: 500;
-}
-
-time {
-	opacity: 0.5;
-}
-
-.icon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	max-width: 1.2em;
-	max-height: 1.2em;
-	text-decoration: none;
-	vertical-align: text-bottom;
-	margin-right: 0.5em;
-}
-
-/*
- * Render emoji icons using a ::before pseudo-element to keep the glyph
- * out of the DOM textContent traversal. This avoids double-rendering icons
- * in callouts and page titles.
- * NOTE(slim/html-export-pseudo-icons): I can't tagref this because it will
- * flag as a duplicate tag after codegen.
- */
-.icon[data-emoji]::before {
-	content: attr(data-emoji);
-}
-
-img.icon {
-	border-radius: 3px;
-}
-
-.callout img.notion-static-icon {
-	width: 1em;
-	height: 1em;
-}
-
-.callout p {
-	margin: 0;
-}
-
-.callout h1,
-.callout h2,
-.callout h3 {
-	margin: 0 0 0.6rem;
-}
-
-.user-icon {
-	width: 1.5em;
-	height: 1.5em;
-	border-radius: 100%;
-	margin-right: 0.5rem;
-}
-
-.user-icon-inner {
-	font-size: 0.8em;
-}
-
-.text-icon {
-	border: 1px solid #000;
-	text-align: center;
-}
-
-.page-cover-image {
-	display: block;
-	object-fit: cover;
-	width: 100%;
-	max-height: 30vh;
-}
-
-.page-header-icon {
-	font-size: 3rem;
-	margin-bottom: 1rem;
-}
-
-.page-header-icon-with-cover {
-	margin-top: -0.72em;
-	margin-left: 0.07em;
-}
-
-.page-header-icon img {
-	border-radius: 3px;
-}
-
-.link-to-page {
-	margin: 1em 0;
-	padding: 0;
-	border: none;
-	font-weight: 500;
-}
-
-p > .user {
-	opacity: 0.5;
-}
-
-td > .user,
-td > time {
-	white-space: nowrap;
-}
-
-input[type="checkbox"] {
-	margin-right: 0.4em;
-	vertical-align: middle;
-}
-
-p {
-	margin-top: 0.5em;
-	margin-bottom: 0.5em;
-}
-
-.image {
-	border: none;
-	margin: 1.5em 0;
-	padding: 0;
-	border-radius: 0;
-	text-align: center;
-}
-
-.code,
-code {
-	background: rgba(135, 131, 120, 0.15);
-	border-radius: 3px;
-	padding: 0.2em 0.4em;
-	border-radius: 3px;
-	font-size: 85%;
-	tab-size: 2;
-}
-
-code {
-	color: #eb5757;
-}
-
+  font-size: 1.25rem; line-height: 1.35; letter-spacing: -.01em; font-weight: 650;
+  margin: 36px 0 10px;
+}
+p { margin: 0 0 16px; }
+strong { font-weight: 650; }
+ul.list { margin: 0 0 18px; padding-left: 1.25em; }
+ul.list li { margin: 4px 0; padding-left: 4px; }
+ul.list li::marker { color: var(--accent); }
+
+:not(pre) > code {
+  font-size: .86em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 1px 6px; border-radius: 5px;
+  white-space: nowrap;
+}
+
+/* ---------- Code blocks ---------- */
 .code {
-	padding: 1.5em 1em;
+  margin: 18px 0 24px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--code-bg);
+  overflow: hidden;
+}
+.code-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+  font-size: 12.5px; color: var(--text-muted);
+  font-family: "JetBrains Mono", monospace;
+}
+.copy {
+  font: inherit; font-size: 12px; cursor: pointer;
+  background: transparent; color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px;
+}
+.copy:hover { color: var(--text); }
+.code pre {
+  margin: 0; padding: 16px 18px; overflow-x: auto;
+  font-size: 14px; line-height: 1.65; color: var(--code-text);
+}
+.k { color: var(--tok-key); }
+.t { color: var(--tok-type); }
+.s { color: var(--tok-str); }
+.c { color: var(--tok-com); font-style: italic; }
+.f { color: var(--tok-fn); }
+
+/* ---------- Callouts ---------- */
+.callout {
+  display: flex; gap: 14px;
+  margin: 22px 0;
+  padding: 16px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.callout-icon { flex: none; font-size: 18px; line-height: 1.5; }
+.callout p:last-child { margin-bottom: 0; }
+.callout-title { font-weight: 650; margin-bottom: 4px; }
+.callout.tip { background: var(--accent-soft); border-color: transparent; }
+.callout.warn { background: var(--warn-soft); border-color: transparent; }
+.callout.good { background: var(--new-soft); border-color: transparent; }
+
+/* ---------- Diagrams ---------- */
+.diagram {
+  margin: 22px 0 28px;
+  padding: 26px 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.diagram-caption {
+  text-align: center; font-size: 13.5px; color: var(--text-muted);
+  margin-top: 18px;
+}
+.flow { display: flex; flex-direction: column; align-items: center; }
+.flow.row { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 0; }
+.node {
+  min-width: 170px; max-width: 100%;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-weight: 600; font-size: 15px; line-height: 1.35;
+}
+.node small { display: block; font-weight: 400; font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.node.js { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.node.old { background: var(--old-soft); border-color: color-mix(in srgb, var(--old) 35%, transparent); color: var(--old); }
+.node.new { background: var(--new-soft); border-color: color-mix(in srgb, var(--new) 35%, transparent); color: var(--new); }
+.node.native { background: var(--surface-2); }
+.node.dashed { border-style: dashed; background: transparent; color: var(--text-muted); font-weight: 500; }
+.arrow {
+  position: relative; width: 2px; height: 30px;
+  background: var(--border); margin: 3px 0 7px;
+}
+.arrow::after {
+  content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
+  border: 6px solid transparent; border-top: 7px solid var(--border); border-bottom: 0;
+}
+.arrow.both::before {
+  content: ""; position: absolute; left: 50%; top: -6px; transform: translateX(-50%);
+  border: 6px solid transparent; border-bottom: 7px solid var(--border); border-top: 0;
+}
+.arrow-label {
+  font-size: 12.5px; color: var(--text-muted); font-family: "JetBrains Mono", monospace;
+  margin: -2px 0 2px;
+}
+.h-arrow { align-self: center; color: var(--text-muted); padding: 0 10px; font-size: 18px; }
+
+.layer {
+  width: 100%; max-width: 460px;
+  border-radius: 12px; padding: 14px 18px;
+  border: 1px solid var(--border);
+}
+.layer-title { font-weight: 700; font-size: 15.5px; margin-bottom: 8px; }
+.layer .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.layer .tags span {
+  font-size: 13px; padding: 2px 9px; border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+}
+.layer.l-js { background: var(--accent-soft); }
+.layer.l-rt { background: var(--new-soft); }
+.layer.l-na { background: var(--surface-2); }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.split > .col { display: flex; flex-direction: column; align-items: center; }
+.col-label {
+  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  margin-bottom: 12px; padding: 2px 10px; border-radius: 999px;
+}
+.col-label.old { color: var(--old); background: var(--old-soft); }
+.col-label.new { color: var(--new); background: var(--new-soft); }
+
+.branch { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; width: 100%; max-width: 440px; }
+.branch > div { display: flex; flex-direction: column; align-items: center; }
+.fork {
+  width: 50%; height: 16px; margin: 0 auto;
+  border: 2px solid var(--border); border-bottom: 0; border-radius: 8px 8px 0 0;
+}
+.join {
+  width: 50%; height: 16px; margin: 0 auto;
+  border: 2px solid var(--border); border-top: 0; border-radius: 0 0 8px 8px;
 }
 
-.code-wrap {
-	white-space: pre-wrap;
-	word-break: break-all;
+/* ---------- Cards ---------- */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 22px 0 8px; }
+.card {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px; background: var(--surface); box-shadow: var(--shadow);
+}
+a.card { color: inherit; display: block; }
+a.card:hover { text-decoration: none; border-color: var(--accent); }
+.card-kicker { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.card-title { font-size: 1.1rem; font-weight: 700; margin: 2px 0 4px; }
+.card p { font-size: 15px; color: var(--text-muted); margin: 0; line-height: 1.55; }
+
+/* ---------- Tables ---------- */
+.table-wrap { overflow-x: auto; margin: 20px 0 28px; border: 1px solid var(--border); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.5; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--surface-2); font-weight: 650; font-size: 13.5px; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+th.old { color: var(--old); }
+th.new { color: var(--new); }
+
+/* ---------- Interview answer ---------- */
+.answer {
+  position: relative;
+  margin: 22px 0;
+  padding: 26px 28px 10px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  box-shadow: var(--shadow);
+  font-size: 1.04rem;
+}
+.answer p { margin-bottom: 16px; }
+
+.cheat {
+  display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin: 20px 0;
+}
+.cheat div {
+  border-radius: 10px; padding: 14px; text-align: center;
+  background: var(--surface); border: 1px solid var(--border);
+}
+.cheat b { display: block; font-size: 1.05rem; }
+.cheat span { font-size: 13.5px; color: var(--text-muted); }
+
+footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+
+/* ---------- Mobile ---------- */
+.mobile-toc { display: none; }
+@media (max-width: 960px) {
+  .layout { grid-template-columns: minmax(0,1fr); gap: 0; padding: 0 16px; }
+  .sidebar { display: none; }
+  main { padding-top: 28px; max-width: none; }
+  .mobile-toc {
+    display: block; margin: 24px 0 0;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+  }
+  .mobile-toc summary { padding: 12px 16px; font-weight: 600; cursor: pointer; font-size: 15px; }
+  .mobile-toc .toc { padding: 0 16px 12px 26px; }
+  .mobile-toc .theme-toggle { margin: 0 16px 14px; }
+}
+@media (max-width: 600px) {
+  body { font-size: 16.5px; }
+  h2 { font-size: 1.55rem; }
+  .cards, .split, .cheat { grid-template-columns: minmax(0,1fr); }
+  .cheat { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .split { gap: 28px; }
+  .node { min-width: 140px; font-size: 14.5px; }
+  .answer { padding: 20px 18px 6px; }
+  .diagram { padding: 22px 12px; }
+}
+@media print {
+  .sidebar, .mobile-toc, .copy { display: none; }
+  .layout { display: block; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar" aria-label="Table of contents">
+    <div class="brand"><span class="brand-mark">⚛</span> RN Architecture</div>
+    <p class="toc-label">On this page</p>
+    <ol class="toc" id="toc">
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#bridge">Old architecture: the Bridge</a></li>
+      <li><a href="#new-architecture">The New Architecture</a></li>
+      <li><a href="#jsi">JSI</a></li>
+      <li><a href="#fabric">Fabric</a></li>
+      <li><a href="#turbomodules">TurboModules</a></li>
+      <li><a href="#codegen">Codegen</a></li>
+      <li><a href="#big-picture">Putting it together</a></li>
+      <li><a href="#performance">Performance</a></li>
+      <li><a href="#interview">One-minute answer</a></li>
+    </ol>
+    <button class="theme-toggle" type="button" data-theme-toggle>◐ Toggle theme</button>
+  </aside>
+
+  <main>
+    <header>
+      <span class="eyebrow">Study notes</span>
+      <h1 class="title">React Native Architecture</h1>
+      <p class="lede">How JavaScript talks to native Android and iOS, why the old Bridge was replaced, and what JSI, Fabric, TurboModules and Codegen each do. Written for interview preparation.</p>
+      <div class="meta">
+        <span class="chip">~12 min read</span>
+        <span class="chip">Bridge → JSI</span>
+        <span class="chip">Interview ready</span>
+      </div>
+
+      <details class="mobile-toc">
+        <summary>Contents</summary>
+        <ol class="toc">
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#bridge">Old architecture: the Bridge</a></li>
+          <li><a href="#new-architecture">The New Architecture</a></li>
+          <li><a href="#jsi">JSI</a></li>
+          <li><a href="#fabric">Fabric</a></li>
+          <li><a href="#turbomodules">TurboModules</a></li>
+          <li><a href="#codegen">Codegen</a></li>
+          <li><a href="#big-picture">Putting it together</a></li>
+          <li><a href="#performance">Performance</a></li>
+          <li><a href="#interview">One-minute answer</a></li>
+        </ol>
+        <button class="theme-toggle" type="button" data-theme-toggle>◐ Toggle theme</button>
+      </details>
+    </header>
+
+    <!-- 01 -->
+    <section id="overview">
+      <div class="sec-num">01</div>
+      <h2>Overview</h2>
+      <p>React Native lets us build <strong>native mobile applications</strong> using JavaScript/TypeScript and React. The JavaScript code runs inside a JavaScript engine (Hermes by default), and React Native connects that code to native Android and iOS functionality.</p>
+      <p>Unlike React for the web, which renders HTML elements, React Native renders <strong>real native UI components</strong>. A <code>&lt;View&gt;</code> becomes an Android <code>ViewGroup</code> or an iOS <code>UIView</code>.</p>
+
+      <h3>The three layers</h3>
+      <p>Think of a React Native app as three major areas stacked on top of each other:</p>
+      <figure class="diagram">
+        <div class="flow">
+          <div class="layer l-js">
+            <div class="layer-title">JavaScript</div>
+            <div class="tags"><span>React components</span><span>Business logic</span><span>State management</span><span>API calls</span></div>
+          </div>
+          <div class="arrow both"></div>
+          <div class="arrow-label">communication</div>
+          <div class="layer l-rt">
+            <div class="layer-title">React Native runtime</div>
+            <div class="tags"><span>JSI</span><span>Bridge (legacy)</span><span>Fabric</span><span>TurboModules</span></div>
+          </div>
+          <div class="arrow both"></div>
+          <div class="layer l-na">
+            <div class="layer-title">Native platform</div>
+            <div class="tags"><span>Android / iOS</span><span>UI</span><span>Camera</span><span>GPS</span><span>Storage</span><span>Sensors</span><span>Bluetooth</span></div>
+          </div>
+        </div>
+        <figcaption class="diagram-caption">The runtime in the middle is what changed between the old and new architecture.</figcaption>
+      </figure>
+    </section>
+
+    <!-- 02 -->
+    <section id="bridge">
+      <div class="sec-num">02</div>
+      <h2>Old architecture: the Bridge</h2>
+      <p>The old architecture was built around a single component: <strong>the Bridge</strong>. Every interaction between JavaScript and native code had to cross it.</p>
+
+      <figure class="diagram">
+        <div class="split">
+          <div class="col">
+            <span class="col-label old">Concept</span>
+            <div class="node js">JavaScript</div>
+            <div class="arrow both"></div>
+            <div class="node old">Bridge</div>
+            <div class="arrow both"></div>
+            <div class="node native">Native</div>
+          </div>
+          <div class="col">
+            <span class="col-label old">Example</span>
+            <div class="node js">JS<small>"Open the camera"</small></div>
+            <div class="arrow"></div>
+            <div class="node old">Bridge</div>
+            <div class="arrow"></div>
+            <div class="node native">Native Camera API</div>
+          </div>
+        </div>
+      </figure>
+
+      <p>The Bridge used <strong>asynchronous, serialized communication</strong>. Data had to be converted into JSON-like messages before crossing the boundary and parsed again on the other side.</p>
+
+      <h3>Why was the Bridge a problem?</h3>
+      <p>Imagine calling a native module with a small object:</p>
+      <div class="code">
+        <div class="code-head"><span>JavaScript</span><button class="copy" type="button">Copy</button></div>
+<pre><code>NativeModule.<span class="f">doSomething</span>({
+  userId: <span class="t">123</span>,
+  name: <span class="s">"John"</span>,
+});</code></pre>
+      </div>
+      <p>Even this simple call has to travel through several steps:</p>
+      <figure class="diagram">
+        <div class="flow">
+          <div class="node js">JavaScript</div>
+          <div class="arrow"></div>
+          <div class="node old">Serialize data<small>object → JSON string</small></div>
+          <div class="arrow"></div>
+          <div class="node old">Bridge<small>async message queue</small></div>
+          <div class="arrow"></div>
+          <div class="node old">Deserialize data<small>JSON string → native types</small></div>
+          <div class="arrow"></div>
+          <div class="node native">Native API</div>
+        </div>
+      </figure>
+      <p>One call is cheap. <strong>Thousands of calls per second</strong> are not. The cost becomes noticeable with:</p>
+      <ul class="list">
+        <li>animations</li>
+        <li>gestures</li>
+        <li>large lists</li>
+        <li>high-frequency events (scroll, sensors)</li>
+        <li>complex native modules</li>
+        <li>large amounts of data crossing the JS/native boundary</li>
+      </ul>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div><p class="callout-title">Key limitation</p><p>Because everything was asynchronous and serialized, JavaScript could never call native code synchronously, and a busy Bridge meant dropped frames. The Bridge became one of the biggest architectural bottlenecks.</p></div>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section id="new-architecture">
+      <div class="sec-num">03</div>
+      <h2>The New Architecture</h2>
+      <p>The New Architecture was introduced to remove these limitations. It is enabled by default since React Native 0.76. It rests on four technologies:</p>
+
+      <div class="cards">
+        <a class="card" href="#jsi"><div class="card-kicker">Foundation</div><div class="card-title">JSI</div><p>A direct interface between JavaScript and C++/native code. No serialization.</p></a>
+        <a class="card" href="#fabric"><div class="card-kicker">Rendering</div><div class="card-title">Fabric</div><p>The new rendering system that coordinates React with native UI.</p></a>
+        <a class="card" href="#turbomodules"><div class="card-kicker">Native modules</div><div class="card-title">TurboModules</div><p>The new native module system, built on JSI and loaded lazily.</p></a>
+        <a class="card" href="#codegen"><div class="card-kicker">Type safety</div><div class="card-title">Codegen</div><p>Generates type-safe native interfaces from TypeScript specs.</p></a>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-icon">💡</div>
+        <div><p class="callout-title">Remember this for your interview</p><p><strong>JSI</strong> is the foundation, <strong>Fabric</strong> is the new rendering system, <strong>TurboModules</strong> are the new native module system, and <strong>Codegen</strong> provides type-safe native interfaces.</p></div>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section id="jsi">
+      <div class="sec-num">04</div>
+      <h2>JSI: JavaScript Interface</h2>
+      <p>JSI is a lightweight C++ API that lets JavaScript interact <strong>directly</strong> with C++ and native code, without relying on the old asynchronous Bridge.</p>
+
+      <figure class="diagram">
+        <div class="split">
+          <div class="col">
+            <span class="col-label old">Before</span>
+            <div class="node js">JS</div>
+            <div class="arrow"></div>
+            <div class="node old">Serialize → Bridge → Deserialize</div>
+            <div class="arrow"></div>
+            <div class="node native">Native</div>
+          </div>
+          <div class="col">
+            <span class="col-label new">With JSI</span>
+            <div class="node js">JS</div>
+            <div class="arrow both"></div>
+            <div class="node new">JSI</div>
+            <div class="arrow both"></div>
+            <div class="node native">C++ / Native</div>
+          </div>
+        </div>
+      </figure>
+
+      <p>With JSI, JavaScript can hold <strong>references to C++ objects</strong> and call their methods directly. This gives us:</p>
+      <ul class="list">
+        <li><strong>No serialization overhead</strong>: data is not converted to JSON to cross the boundary.</li>
+        <li><strong>Synchronous calls</strong> when needed, as well as asynchronous ones.</li>
+        <li><strong>Engine independence</strong>: JSI is an abstraction, so React Native can run on Hermes, JavaScriptCore, or other engines.</li>
+      </ul>
+    </section>
+
+    <!-- 05 -->
+    <section id="fabric">
+      <div class="sec-num">05</div>
+      <h2>Fabric</h2>
+      <p>Fabric is React Native's <strong>new rendering system</strong>. It is responsible for coordinating React's rendering with native UI.</p>
+
+      <figure class="diagram">
+        <div class="split">
+          <div class="col">
+            <span class="col-label old">Old rendering</span>
+            <div class="node js">React</div>
+            <div class="arrow"></div>
+            <div class="node">Shadow Tree</div>
+            <div class="arrow"></div>
+            <div class="node old">Bridge</div>
+            <div class="arrow"></div>
+            <div class="node native">Native UI</div>
+          </div>
+          <div class="col">
+            <span class="col-label new">Fabric</span>
+            <div class="node js">React</div>
+            <div class="arrow"></div>
+            <div class="node new">Fabric<small>C++ Shadow Tree via JSI</small></div>
+            <div class="arrow"></div>
+            <div class="node native">Native UI</div>
+          </div>
+        </div>
+      </figure>
+
+      <p>Because the shadow tree now lives in shared C++ and is reached through JSI, Fabric brings improvements in:</p>
+      <ul class="list">
+        <li>rendering performance</li>
+        <li>responsiveness</li>
+        <li>support for concurrent React features (e.g. <code>startTransition</code>, Suspense)</li>
+        <li>synchronous layout and rendering where appropriate</li>
+        <li>better interoperability with native components</li>
+      </ul>
+    </section>
+
+    <!-- 06 -->
+    <section id="turbomodules">
+      <div class="sec-num">06</div>
+      <h2>TurboModules</h2>
+      <p>TurboModules replace the older <strong>Native Modules</strong> system. Native modules are how JavaScript reaches platform capabilities such as:</p>
+      <div class="meta" style="margin-bottom:18px">
+        <span class="chip">GPS</span><span class="chip">Camera</span><span class="chip">Bluetooth</span><span class="chip">Secure Storage</span><span class="chip">File System</span>
+      </div>
+
+      <figure class="diagram">
+        <div class="split">
+          <div class="col">
+            <span class="col-label old">Previously</span>
+            <div class="node js">JavaScript</div>
+            <div class="arrow"></div>
+            <div class="node old">Bridge</div>
+            <div class="arrow"></div>
+            <div class="node native">Native Module</div>
+          </div>
+          <div class="col">
+            <span class="col-label new">TurboModules</span>
+            <div class="node js">JavaScript</div>
+            <div class="arrow"></div>
+            <div class="node new">JSI</div>
+            <div class="arrow"></div>
+            <div class="node new">TurboModule</div>
+            <div class="arrow"></div>
+            <div class="node native">Native API</div>
+          </div>
+        </div>
+      </figure>
+
+      <h3>The big win: lazy loading</h3>
+      <p>In the old system, <strong>every native module was initialized at app startup</strong>, whether it was used or not. TurboModules are loaded <strong>only when they are first needed</strong>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th class="old">Old Native Modules</th><th class="new">TurboModules</th></tr></thead>
+          <tbody>
+            <tr><td>At startup</td><td>App starts → load all 100 modules</td><td>App starts → load nothing extra</td></tr>
+            <tr><td>On first use</td><td>Already loaded</td><td>Module is loaded on demand</td></tr>
+            <tr><td>Result</td><td>Slower startup, more memory</td><td>Faster startup, less memory</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 07 -->
+    <section id="codegen">
+      <div class="sec-num">07</div>
+      <h2>Codegen</h2>
+      <p>Codegen generates the native "glue" code from a <strong>typed JavaScript/TypeScript specification</strong>, so the JS side and native side always agree on the interface.</p>
+      <p>You describe the module once in TypeScript:</p>
+      <div class="code">
+        <div class="code-head"><span>NativeStorage.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code><span class="k">import type</span> { <span class="t">TurboModule</span> } <span class="k">from</span> <span class="s">'react-native'</span>;
+<span class="k">import</span> { TurboModuleRegistry } <span class="k">from</span> <span class="s">'react-native'</span>;
+
+<span class="k">export interface</span> <span class="t">Spec</span> <span class="k">extends</span> <span class="t">TurboModule</span> {
+  <span class="f">getItem</span>(key: <span class="t">string</span>): <span class="t">Promise</span>&lt;<span class="t">string</span>&gt;;
+  <span class="f">setItem</span>(key: <span class="t">string</span>, value: <span class="t">string</span>): <span class="t">Promise</span>&lt;<span class="t">void</span>&gt;;
 }
 
-.code > code {
-	background: none;
-	padding: 0;
-	font-size: 100%;
-	color: inherit;
-}
+<span class="c">// Codegen reads this spec and generates the native interfaces</span>
+<span class="k">export default</span> TurboModuleRegistry.<span class="f">getEnforcing</span>&lt;<span class="t">Spec</span>&gt;(<span class="s">'NativeStorage'</span>);</code></pre>
+      </div>
+      <p>At build time, Codegen turns that spec into native interfaces and types:</p>
+      <figure class="diagram">
+        <div class="flow">
+          <div class="node js">TypeScript specification</div>
+          <div class="arrow"></div>
+          <div class="node new">Codegen<small>runs at build time</small></div>
+          <div class="arrow"></div>
+          <div class="node native">Native interfaces<small>C++ · Java/Kotlin · Objective-C</small></div>
+        </div>
+      </figure>
+      <p>This gives:</p>
+      <ul class="list">
+        <li><strong>Type safety</strong>: type mismatches are caught at build time, not as runtime crashes.</li>
+        <li><strong>Consistency</strong>: less hand-written, error-prone boilerplate on each platform.</li>
+        <li><strong>Predictable JS ↔ Native communication</strong>.</li>
+      </ul>
+    </section>
 
-blockquote {
-	font-size: 1em;
-	margin: 1em 0;
-	padding-left: 1em;
-	border-left: 3px solid rgb(55, 53, 47);
-}
+    <!-- 08 -->
+    <section id="big-picture">
+      <div class="sec-num">08</div>
+      <h2>Putting it all together</h2>
+      <p>This is the diagram worth memorizing:</p>
+      <figure class="diagram">
+        <div class="flow">
+          <div class="node js">React Application</div>
+          <div class="arrow"></div>
+          <div class="node js">JavaScript Engine<small>Hermes</small></div>
+          <div class="arrow"></div>
+          <div class="node new">JSI</div>
+          <div class="arrow" style="height:14px;margin-bottom:0"></div>
+          <div class="fork" style="max-width:220px"></div>
+          <div class="branch">
+            <div>
+              <div class="arrow" style="height:14px"></div>
+              <div class="node new">Fabric</div>
+              <div class="arrow"></div>
+              <div class="node">UI Rendering</div>
+            </div>
+            <div>
+              <div class="arrow" style="height:14px"></div>
+              <div class="node new">TurboModules</div>
+              <div class="arrow"></div>
+              <div class="node">Native APIs</div>
+            </div>
+          </div>
+          <div class="join" style="max-width:220px;margin-top:8px"></div>
+          <div class="arrow" style="height:18px"></div>
+          <div class="node native">Android / iOS</div>
+          <div style="height:22px"></div>
+          <div class="node dashed">Codegen → type-safe interfaces → Fabric &amp; TurboModules</div>
+        </div>
+      </figure>
 
-blockquote.quote-large {
-	font-size: 1.25em;
-}
+      <h3>Old vs New at a glance</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Concern</th><th class="old">Old architecture</th><th class="new">New architecture</th></tr></thead>
+          <tbody>
+            <tr><td>JS ↔ Native</td><td>Bridge</td><td>JSI</td></tr>
+            <tr><td>Communication</td><td>Async only, serialized JSON</td><td>Direct calls, sync or async</td></tr>
+            <tr><td>Rendering</td><td>Legacy renderer via Bridge</td><td>Fabric</td></tr>
+            <tr><td>Native modules</td><td>Native Modules, loaded eagerly</td><td>TurboModules, loaded lazily</td></tr>
+            <tr><td>Type safety</td><td>Hand-written, unchecked</td><td>Codegen from typed specs</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-.bookmark {
-	text-decoration: none;
-	max-height: 8em;
-	padding: 0;
-	display: flex;
-	width: 100%;
-	align-items: stretch;
-}
+      <h3>One thing to memorize</h3>
+      <figure class="diagram">
+        <div class="split">
+          <div class="col">
+            <span class="col-label old">Old</span>
+            <div class="node js">JavaScript</div>
+            <div class="arrow"></div>
+            <div class="node old">Bridge</div>
+            <div class="arrow"></div>
+            <div class="node">Native Modules</div>
+            <div class="arrow"></div>
+            <div class="node native">Native UI</div>
+          </div>
+          <div class="col">
+            <span class="col-label new">New</span>
+            <div class="node js">JavaScript</div>
+            <div class="arrow"></div>
+            <div class="node new">JSI</div>
+            <div class="arrow" style="height:14px;margin-bottom:0"></div>
+            <div class="fork" style="width:60%"></div>
+            <div class="branch" style="gap:8px">
+              <div><div class="arrow" style="height:12px"></div><div class="node new" style="min-width:0;width:100%">Fabric</div><div class="arrow"></div><div class="node" style="min-width:0;width:100%">UI</div></div>
+              <div><div class="arrow" style="height:12px"></div><div class="node new" style="min-width:0;width:100%">TurboModules</div><div class="arrow"></div><div class="node" style="min-width:0;width:100%">Native APIs</div></div>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </section>
 
-.bookmark-title {
-	font-size: 0.85em;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	height: 1.75em;
-	white-space: nowrap;
-}
+    <!-- 09 -->
+    <section id="performance">
+      <div class="sec-num">09</div>
+      <h2>Performance</h2>
 
-.bookmark-text {
-	display: flex;
-	flex-direction: column;
-}
+      <h3>Why can React Native apps become slow?</h3>
+      <p>Performance problems usually come from one of these:</p>
+      <ul class="list">
+        <li>too much work on the <strong>JavaScript thread</strong></li>
+        <li>excessive JS ↔ native interactions</li>
+        <li>unnecessary re-renders</li>
+        <li>large lists rendered inefficiently</li>
+        <li>expensive calculations during render</li>
+        <li>poorly optimized images</li>
+      </ul>
 
-.bookmark-info {
-	flex: 4 1 180px;
-	padding: 12px 14px 14px;
-	display: flex;
-	flex-direction: column;
-	justify-content: space-between;
-}
+      <h3>How do you optimize React Native?</h3>
+      <p>Know these three areas for interviews.</p>
 
-.bookmark-image {
-	width: 33%;
-	flex: 1 1 180px;
-	display: block;
-	position: relative;
-	object-fit: cover;
-	border-radius: 1px;
-}
+      <h3>1. React optimization</h3>
+      <ul class="list">
+        <li><code>React.memo</code>: skip re-rendering a component when its props haven't changed.</li>
+        <li><code>useMemo</code>: cache the result of an expensive calculation.</li>
+        <li><code>useCallback</code>: keep a function reference stable between renders.</li>
+        <li>Avoid unnecessary state and keep state as close to where it's used as possible.</li>
+        <li>Avoid unnecessary re-renders; profile with React DevTools.</li>
+      </ul>
 
-.bookmark-description {
-	color: rgba(55, 53, 47, 0.6);
-	font-size: 0.75em;
-	overflow: hidden;
-	max-height: 4.5em;
-	word-break: break-word;
-}
+      <h3>2. Lists</h3>
+      <p>Use <code>FlatList</code> (virtualized, renders only what's on screen) instead of <code>ScrollView</code> (renders everything at once) for large datasets.</p>
+      <div class="code">
+        <div class="code-head"><span>OptimizedList.tsx</span><button class="copy" type="button">Copy</button></div>
+<pre><code>&lt;<span class="t">FlatList</span>
+  data={items}
+  renderItem={renderItem}                  <span class="c">// memoized with useCallback</span>
+  keyExtractor={(item) =&gt; item.id}         <span class="c">// stable, unique keys</span>
+  getItemLayout={(_, index) =&gt; ({          <span class="c">// skip measuring fixed-height rows</span>
+    length: <span class="t">ITEM_HEIGHT</span>,
+    offset: <span class="t">ITEM_HEIGHT</span> * index,
+    index,
+  })}
+  initialNumToRender={<span class="t">10</span>}                  <span class="c">// items in the first render</span>
+  maxToRenderPerBatch={<span class="t">10</span>}                 <span class="c">// items rendered per batch</span>
+  windowSize={<span class="t">5</span>}                           <span class="c">// screens of content kept mounted</span>
+/&gt;</code></pre>
+      </div>
 
-.bookmark-href {
-	font-size: 0.75em;
-	margin-top: 0.25em;
-}
+      <h3>3. Images</h3>
+      <ul class="list">
+        <li>Serve appropriately sized images, not full-resolution originals.</li>
+        <li>Cache images.</li>
+        <li>Use compressed assets (e.g. WebP).</li>
+        <li>Use an optimized image library (such as <code>expo-image</code>) when needed.</li>
+      </ul>
+    </section>
 
-.tab {
-	margin: 1.25em 0;
-	padding-inline: 1rem;
-	border: 1px solid rgba(55, 53, 47, 0.09);
-}
+    <!-- 10 -->
+    <section id="interview">
+      <div class="sec-num">10</div>
+      <h2>One-minute interview answer</h2>
+      <p>If you're asked to <em>"explain React Native's architecture"</em>, this covers everything in about a minute:</p>
+      <blockquote class="answer">
+        <p>React Native allows us to build native Android and iOS applications using React and JavaScript or TypeScript. Our React code runs in a JavaScript runtime, while the actual UI and platform-specific functionality are handled by native Android and iOS code.</p>
+        <p>Historically, React Native used a <strong>Bridge</strong> for communication between JavaScript and native code. The Bridge serialized messages and communicated asynchronously, which could become a bottleneck for high-frequency communication.</p>
+        <p>The New Architecture addresses this with <strong>JSI, Fabric, TurboModules and Codegen</strong>. JSI provides a more direct interface between JavaScript and native or C++ code. Fabric is the new rendering system, while TurboModules are the newer native module system and support things such as lazy loading. Codegen generates type-safe native interfaces from specifications.</p>
+        <p>So, at a high level, React handles the application and component logic, JSI provides the JavaScript-to-native interface, Fabric handles rendering, TurboModules provide native functionality, and Android or iOS ultimately renders and executes the native functionality.</p>
+      </blockquote>
 
-.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
-.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
-.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
-.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
-.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
-.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
-.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
-.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
-.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
-.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
-.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
-.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
-.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
-.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
-.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
-.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
-.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
-.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
-.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
-.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
-.highlight-default {
-	color: rgba(44, 44, 43, 1);
-}
-.highlight-gray {
-	color: rgba(125, 122, 117, 1);
-	fill: rgba(125, 122, 117, 1);
-}
-.highlight-brown {
-	color: rgba(159, 118, 90, 1);
-	fill: rgba(159, 118, 90, 1);
-}
-.highlight-orange {
-	color: rgba(210, 123, 45, 1);
-	fill: rgba(210, 123, 45, 1);
-}
-.highlight-yellow {
-	color: rgba(203, 148, 52, 1);
-	fill: rgba(203, 148, 52, 1);
-}
-.highlight-teal {
-	color: rgba(80, 148, 110, 1);
-	fill: rgba(80, 148, 110, 1);
-}
-.highlight-blue {
-	color: rgba(56, 125, 201, 1);
-	fill: rgba(56, 125, 201, 1);
-}
-.highlight-purple {
-	color: rgba(154, 107, 180, 1);
-	fill: rgba(154, 107, 180, 1);
-}
-.highlight-pink {
-	color: rgba(193, 76, 138, 1);
-	fill: rgba(193, 76, 138, 1);
-}
-.highlight-red {
-	color: rgba(207, 81, 72, 1);
-	fill: rgba(207, 81, 72, 1);
-}
-.highlight-default_background {
-	color: rgba(44, 44, 43, 1);
-}
-.highlight-gray_background {
-	background: rgba(42, 28, 0, 0.07);
-}
-.highlight-brown_background {
-	background: rgba(139, 46, 0, 0.086);
-}
-.highlight-orange_background {
-	background: rgba(224, 101, 1, 0.129);
-}
-.highlight-yellow_background {
-	background: rgba(211, 168, 0, 0.137);
-}
-.highlight-teal_background {
-	background: rgba(0, 100, 45, 0.09);
-}
-.highlight-blue_background {
-	background: rgba(0, 124, 215, 0.094);
-}
-.highlight-purple_background {
-	background: rgba(102, 0, 178, 0.078);
-}
-.highlight-pink_background {
-	background: rgba(197, 0, 93, 0.086);
-}
-.highlight-red_background {
-	background: rgba(223, 22, 0, 0.094);
-}
-.block-color-default {
-	color: inherit;
-	fill: inherit;
-}
-.block-color-gray {
-	color: rgba(125, 122, 117, 1);
-	fill: rgba(125, 122, 117, 1);
-}
-.block-color-brown {
-	color: rgba(159, 118, 90, 1);
-	fill: rgba(159, 118, 90, 1);
-}
-.block-color-orange {
-	color: rgba(210, 123, 45, 1);
-	fill: rgba(210, 123, 45, 1);
-}
-.block-color-yellow {
-	color: rgba(203, 148, 52, 1);
-	fill: rgba(203, 148, 52, 1);
-}
-.block-color-teal {
-	color: rgba(80, 148, 110, 1);
-	fill: rgba(80, 148, 110, 1);
-}
-.block-color-blue {
-	color: rgba(56, 125, 201, 1);
-	fill: rgba(56, 125, 201, 1);
-}
-.block-color-purple {
-	color: rgba(154, 107, 180, 1);
-	fill: rgba(154, 107, 180, 1);
-}
-.block-color-pink {
-	color: rgba(193, 76, 138, 1);
-	fill: rgba(193, 76, 138, 1);
-}
-.block-color-red {
-	color: rgba(207, 81, 72, 1);
-	fill: rgba(207, 81, 72, 1);
-}
-.block-color-default_background {
-	color: inherit;
-	fill: inherit;
-}
-.block-color-gray_background {
-	background: rgba(240, 239, 237, 1);
-}
-.block-color-brown_background {
-	background: rgba(245, 237, 233, 1);
-}
-.block-color-orange_background {
-	background: rgba(251, 235, 222, 1);
-}
-.block-color-yellow_background {
-	background: rgba(249, 243, 220, 1);
-}
-.block-color-teal_background {
-	background: rgba(232, 241, 236, 1);
-}
-.block-color-blue_background {
-	background: rgba(229, 242, 252, 1);
-}
-.block-color-purple_background {
-	background: rgba(243, 235, 249, 1);
-}
-.block-color-pink_background {
-	background: rgba(250, 233, 241, 1);
-}
-.block-color-red_background {
-	background: rgba(252, 233, 231, 1);
-}
-.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
-.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
-.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
-.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
-.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
-.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
-.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
-.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
-.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
-.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+      <h3>Cheat sheet</h3>
+      <div class="cheat">
+        <div><b>JSI</b><span>the foundation</span></div>
+        <div><b>Fabric</b><span>rendering</span></div>
+        <div><b>TurboModules</b><span>native modules</span></div>
+        <div><b>Codegen</b><span>type safety</span></div>
+      </div>
+    </section>
 
-.checkbox {
-	display: inline-flex;
-	vertical-align: text-bottom;
-	width: 16;
-	height: 16;
-	background-size: 16px;
-	margin-left: 2px;
-	margin-right: 5px;
-}
+    <footer>React Native Architecture: study notes for interview preparation.</footer>
+  </main>
+</div>
 
-.checkbox-on {
-	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
-}
+<script>
+(function () {
+  // Theme toggle
+  var root = document.documentElement;
+  try { var saved = localStorage.getItem('rn-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var current = root.getAttribute('data-theme') ||
+        (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      var next = current === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('rn-theme', next); } catch (e) {}
+    });
+  });
 
-.checkbox-off {
-	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
-}
-	
-</style><style>@import url('https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex-swap.min.css')</style></head><body><article id="3e592be1-c41c-8007-add7-e684837f0631" class="page sans"><header><h1 class="page-title" dir="auto">RN Architecture</h1><p class="page-description" dir="auto"></p></header><div class="page-body"><p id="3e592be1-c41c-8062-8b68-c6f36402682f" class="" dir="auto">React Native allows us to build native mobile applications using JavaScript/TypeScript and React. The JavaScript code runs in a JavaScript engine, and React Native connects that JavaScript code to native Android/iOS functionality. Instead of rendering HTML elements like React for the web, React Native renders native UI components.</p><figure id="3e592be1-c41c-8038-95f4-c66f719b1a91" class="image" data-notion-image="image.png" dir="ltr"><a href="image.png"><img style="width:624px" src="image.png"/></a></figure><p id="3e592be1-c41c-801e-add4-eafe057d7b8f" class="" dir="auto">
-</p><h3 id="3e592be1-c41c-80b5-b14a-c4618da572ce" class="" dir="auto"> <strong>Old React Native Architecture</strong></h3><p id="3e592be1-c41c-800c-b1a5-c345aecab51f" class="" dir="auto">The old architecture was primarily based on the:</p><h3 id="3e592be1-c41c-8021-9d0d-dcd334c5b4f2" class="" dir="auto">Bridge</h3><p id="3e592be1-c41c-8015-b82d-c5224b61506f" class="" dir="auto">The Bridge allowed communication between:</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3e592be1-c41c-8097-ad18-ea584a2c0b77" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">JavaScript
-    ↕
-  Bridge
-    ↕
-Native</code></pre><p id="3e592be1-c41c-80cf-ab42-fdf3de6f00bb" class="" dir="auto">For example:</p><pre id="3e592be1-c41c-80c7-bb02-df136a25dc07" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">JS
- |
- | &quot;Call camera&quot;
- ↓
-Bridge
- |
- ↓
-Native Camera API</code></pre><p id="3e592be1-c41c-8085-b93a-cc27777da064" class="" dir="auto">The Bridge used <strong>asynchronous, serialized communication</strong>.</p><p id="3e592be1-c41c-80fc-a89c-c1199e177a74" class="" dir="auto">Data often had to be converted into JSON-like structures before crossing the boundary.</p><h3 id="3e592be1-c41c-805a-aad5-f97d006ba87b" class="" dir="auto"><mark class="highlight-red_background" data-notion-highlight="red_background">Why was the Bridge a problem?</mark></h3><p id="3e592be1-c41c-8014-a3eb-c2adf76463c9" class="" dir="auto">
-</p><p id="3e592be1-c41c-80e9-a8a9-ef76b102ddd4" class="" dir="auto">Imagine you have:</p><pre id="3e592be1-c41c-806d-8006-e336e262613e" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">NativeModule.doSomething({
-  userId:123,
-  name:&quot;John&quot;
-});</code></pre><p id="3e592be1-c41c-8065-9fa5-fd85c64b008c" class="" dir="auto">The data has to travel between JS and native.</p><p id="3e592be1-c41c-8059-80d2-c2f991c47f4b" class="" dir="auto">Conceptually:</p><pre id="3e592be1-c41c-80fc-be88-d7f6449d42e1" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">JavaScript
-   ↓
-Serialize data
-   ↓
-Bridge
-   ↓
-Deserialize data
-   ↓
-Native API</code></pre><p id="3e592be1-c41c-800c-8243-ec521f8b3257" class="" dir="auto">If this happens thousands of times, it can become expensive.</p><p id="3e592be1-c41c-8087-a0fe-ceaf61690f9f" class="" dir="auto">This becomes particularly noticeable with:</p><ul id="3e592be1-c41c-8094-a4e9-d1b514084888" class="bulleted-list" dir="auto"><li style="list-style-type:disc">animations</li></ul><ul id="3e592be1-c41c-8041-b1f6-fa7117f95b15" class="bulleted-list" dir="auto"><li style="list-style-type:disc">gestures</li></ul><ul id="3e592be1-c41c-8008-828f-d19d96c6a0f0" class="bulleted-list" dir="auto"><li style="list-style-type:disc">large lists</li></ul><ul id="3e592be1-c41c-807a-a1ce-fb3608c2bddd" class="bulleted-list" dir="auto"><li style="list-style-type:disc">high-frequency events</li></ul><ul id="3e592be1-c41c-8028-b297-f496a5bd05f5" class="bulleted-list" dir="auto"><li style="list-style-type:disc">complex native modules</li></ul><ul id="3e592be1-c41c-800d-a31b-e466c4c48946" class="bulleted-list" dir="auto"><li style="list-style-type:disc">large amounts of data crossing JS/native boundary</li></ul><p id="3e592be1-c41c-806f-aa48-c7c23e228569" class="" dir="auto">So the Bridge became one of the major architectural limitations.</p><h1 id="3e592be1-c41c-80fb-bfd2-d9d3ee807756" class="" dir="auto"><span style="border-bottom:0.05em solid">React Native New Architecture</span></h1><p id="3e592be1-c41c-803f-bb7c-f32b0e13dfed" class="" dir="auto">The New Architecture was introduced to address these limitations.</p><p id="3e592be1-c41c-80f5-8704-f1ff61ba9792" class="" dir="auto">The major technologies you should remember are:</p><pre id="3e592be1-c41c-809b-b197-dafcb5397483" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">New Architecture
-│
-├── JSI
-├── Fabric
-├── TurboModules
-└── Codegen</code></pre><p id="3e592be1-c41c-807f-ac51-de8bb2ccfa86" class="" dir="auto">Remember this for your interview:</p><blockquote id="3e592be1-c41c-8027-81d3-c07803e2c6cd" class="" dir="auto">JSI is the foundation, Fabric is the new rendering system, TurboModules are the new native module system, and Codegen provides type-safe native interfaces.</blockquote><p id="3e592be1-c41c-80ef-a97a-dd8176a694fd" class="" dir="auto">
-</p><p id="3e592be1-c41c-80f2-8d23-cdaeeb1a682d" class="" dir="auto">JSI — JavaScript Interface</p><p id="3e592be1-c41c-80a8-ab13-e63e674b60fe" class="" dir="auto">It allows JavaScript to interact more directly with C++/native code.</p><pre id="3e592be1-c41c-8084-98d7-ef9a517b3321" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">JS
- ↓
-JSI
- ↓
-C++ / Native</code></pre><p id="3e592be1-c41c-8084-b19f-ebebe4e751e3" class="" dir="auto">This reduces the overhead associated with serialization and asynchronous bridge communication.</p><p id="3e592be1-c41c-80e2-873d-c000babc3e4a" class="" dir="auto">JSI is an interface that allows JavaScript to interact directly with C++ and native functionality without relying on the old asynchronous Bridge model.</p><h1 id="3e592be1-c41c-80f8-9638-dc4918005704" class="" dir="auto">Fabric</h1><p id="3e592be1-c41c-80a0-8149-e2be31f11861" class="" dir="auto">Fabric is the <strong>new rendering system</strong> in React Native.</p><p id="3e592be1-c41c-80ce-882d-e8ad9ab8c554" class="" dir="auto">Old rendering architecture:</p><pre id="3e592be1-c41c-80be-9282-fcca55681e14" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">React
- ↓
-Shadow Tree
- ↓
-Bridge
- ↓
-Native UI</code></pre><p id="3e592be1-c41c-8093-8c52-c14a5eca6a53" class="" dir="auto">New architecture:</p><pre id="3e592be1-c41c-804d-9386-fb63f401183c" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">React
- ↓
-Fabric
- ↓
-Native UI</code></pre><p id="3e592be1-c41c-8075-ab30-d4ff9e6a8226" class="" dir="auto">Fabric is responsible for coordinating React&#x27;s rendering with native UI.</p><p id="3e592be1-c41c-8091-bbec-c996af844ed6" class="" dir="auto">It provides improvements around:</p><ul id="3e592be1-c41c-8033-8f92-e3a00e01c0fc" class="bulleted-list" dir="auto"><li style="list-style-type:disc">rendering</li></ul><ul id="3e592be1-c41c-800b-b339-f1b7cfea29ea" class="bulleted-list" dir="auto"><li style="list-style-type:disc">responsiveness</li></ul><ul id="3e592be1-c41c-8045-bb6f-dc1ca908e77d" class="bulleted-list" dir="auto"><li style="list-style-type:disc">concurrent React features</li></ul><ul id="3e592be1-c41c-80c1-a86d-f5db68b2dd17" class="bulleted-list" dir="auto"><li style="list-style-type:disc">synchronous capabilities where appropriate</li></ul><ul id="3e592be1-c41c-805a-bfaf-cb0a5757c745" class="bulleted-list" dir="auto"><li style="list-style-type:disc">better interoperability with native components</li></ul><h4 id="3e592be1-c41c-8012-8673-c6ebda57349e" class="" dir="auto"><strong>TurboModules</strong></h4><p id="3e592be1-c41c-805f-a841-efa72ed2eea3" class="" dir="auto">TurboModules replace the older Native Modules architecture.</p><p id="3e592be1-c41c-8022-abf7-d84c5680080a" class="" dir="auto">Suppose you need:</p><pre id="3e592be1-c41c-80bb-87f0-d3593d573f87" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">GPS
-Camera
-Bluetooth
-Secure Storage
-File System</code></pre><p id="3e592be1-c41c-8085-b62c-d689313d3bf6" class="" dir="auto">These are native capabilities.</p><p id="3e592be1-c41c-80a1-8816-e138e08e85a5" class="" dir="auto">Previously:</p><pre id="3e592be1-c41c-8096-85fa-d4c57fb9b0f4" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">JavaScript
- ↓
-Bridge
- ↓
-Native Module</code></pre><p id="3e592be1-c41c-80f8-8b39-f55dae39b4b0" class="" dir="auto">With TurboModules:</p><pre id="3e592be1-c41c-80b3-842d-cb7910b5e523" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">JavaScript
- ↓
-JSI
- ↓
-TurboModule
- ↓
-Native API</code></pre><p id="3e592be1-c41c-8063-b9b6-cc792b4cbbc5" class="" dir="auto"><br/>One major advantage is <strong>lazy loading</strong>. Instead of loading every native module when the application starts, ( App starts ⇒ Load 100 native modules), TurboModules can load modules when they&#x27;re actually needed. That can improve startup performance and memory usage.<br/><br/></p><h1 id="3e592be1-c41c-8093-a060-d605b197ed27" class="" dir="auto">Codegen</h1><p id="3e592be1-c41c-80da-abbb-fcb3dd9c2abd" class="" dir="auto">Codegen is another important part.</p><p id="3e592be1-c41c-800d-aae1-c5867db88d2d" class="" dir="auto">Imagine JavaScript/TypeScript defines an interface:</p><pre id="3e592be1-c41c-802d-ac92-ce2fc12f264d" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">interfaceNativeStorage {
-  getItem(key:string):Promise&lt;string&gt;;
-  setItem(key:string,value:string):Promise&lt;void&gt;;
-}</code></pre><p id="3e592be1-c41c-8068-b5a6-c46ffd0bacce" class="" dir="auto">Codegen can generate the required native interfaces/types.</p><p id="3e592be1-c41c-80a2-a438-ed6b6593be16" class="" dir="auto">So:</p><pre id="3e592be1-c41c-8077-80dd-e72f24542249" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">TypeScript specification
-          ↓
-       Codegen
-          ↓
-Native interfaces</code></pre><p id="3e592be1-c41c-8028-bfae-cb726880a8e9" class="" dir="auto">This provides more:</p><ul id="3e592be1-c41c-809a-bdc6-c3840e2f0735" class="bulleted-list" dir="auto"><li style="list-style-type:disc">type safety</li></ul><ul id="3e592be1-c41c-800e-861c-d488f517f348" class="bulleted-list" dir="auto"><li style="list-style-type:disc">consistency</li></ul><ul id="3e592be1-c41c-80ca-b6cf-df7a5ff0bf7d" class="bulleted-list" dir="auto"><li style="list-style-type:disc">predictable JS ↔ Native communication</li></ul><figure id="3e592be1-c41c-8056-91ef-dafc6f5bdee1" class="image" data-notion-image="image%201.png" dir="ltr"><a href="image%201.png"><img style="width:703.984375px" src="image%201.png"/></a></figure><p id="3e592be1-c41c-8004-a106-d0f1b9b399c5" class="" dir="auto">
-</p><p id="3e592be1-c41c-8087-afe6-e45186abe29e" class="" dir="auto">Why can React Native apps become slow?</p><p id="3e592be1-c41c-80e4-8553-dd940ac04e6d" class="" dir="auto">Performance problems can happen when too much work is performed on the JavaScript thread, when there are excessive JS-to-native interactions, unnecessary re-renders, large lists rendered inefficiently, expensive calculations, or poorly optimized images.</p><h1 id="3e592be1-c41c-80d6-b0d0-fb38ae912b1f" class="" dir="auto">How do you optimize React Native?</h1><p id="3e592be1-c41c-8023-90ce-cc16a36ae361" class="" dir="auto">You should know these for interviews:</p><h3 id="3e592be1-c41c-802f-9886-dd7a197c2f5e" class="" dir="auto">React optimization</h3><ul id="3e592be1-c41c-8031-b0ca-ce6140a9ea97" class="bulleted-list" dir="auto"><li style="list-style-type:disc"><code>React.memo</code></li></ul><ul id="3e592be1-c41c-80fb-929b-c2dd7ca3f3b8" class="bulleted-list" dir="auto"><li style="list-style-type:disc"><code>useMemo</code></li></ul><ul id="3e592be1-c41c-8013-8724-cc5ada0cb272" class="bulleted-list" dir="auto"><li style="list-style-type:disc"><code>useCallback</code></li></ul><ul id="3e592be1-c41c-80b1-a302-cdcd10e6b33f" class="bulleted-list" dir="auto"><li style="list-style-type:disc">avoid unnecessary state</li></ul><ul id="3e592be1-c41c-8078-90f3-f14d545b14e6" class="bulleted-list" dir="auto"><li style="list-style-type:disc">avoid unnecessary re-renders</li></ul><h3 id="3e592be1-c41c-80c9-b008-f110d0c4cbe0" class="" dir="auto">Lists</h3><p id="3e592be1-c41c-8046-bef8-da555cf0ba28" class="" dir="auto">Use:</p><pre id="3e592be1-c41c-80fc-b58c-f22f0f088a34" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">FlatList</code></pre><p id="3e592be1-c41c-80a3-80b2-d44678393b7d" class="" dir="auto">instead of:</p><pre id="3e592be1-c41c-8003-8aa2-c5b89324c14a" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">ScrollView</code></pre><p id="3e592be1-c41c-8067-95fe-d56228070a64" class="" dir="auto">for large datasets.</p><p id="3e592be1-c41c-8027-824d-e01ea1c16ef9" class="" dir="auto">Optimize:</p><ul id="3e592be1-c41c-806e-b359-f1c03d8639bf" class="bulleted-list" dir="auto"><li style="list-style-type:disc"><code>keyExtractor</code></li></ul><ul id="3e592be1-c41c-8029-b9a5-e834afec7eb6" class="bulleted-list" dir="auto"><li style="list-style-type:disc"><code>getItemLayout</code></li></ul><ul id="3e592be1-c41c-80ed-84fd-e4bc3882ffb6" class="bulleted-list" dir="auto"><li style="list-style-type:disc"><code>initialNumToRender</code></li></ul><ul id="3e592be1-c41c-8086-b266-e917b0e04373" class="bulleted-list" dir="auto"><li style="list-style-type:disc"><code>maxToRenderPerBatch</code></li></ul><ul id="3e592be1-c41c-8068-a190-ffc7071f27eb" class="bulleted-list" dir="auto"><li style="list-style-type:disc"><code>windowSize</code></li></ul><h3 id="3e592be1-c41c-80ed-9db1-e7c23cff7d8c" class="" dir="auto">Images</h3><p id="3e592be1-c41c-80da-85bd-f98c21911cc1" class="" dir="auto">Use:</p><ul id="3e592be1-c41c-802a-aef3-fe4e371eaecd" class="bulleted-list" dir="auto"><li style="list-style-type:disc">appropriate image sizes</li></ul><ul id="3e592be1-c41c-804d-991d-f2c721cbd46c" class="bulleted-list" dir="auto"><li style="list-style-type:disc">caching</li></ul><ul id="3e592be1-c41c-8062-85c6-ead5d517207f" class="bulleted-list" dir="auto"><li style="list-style-type:disc">compressed assets</li></ul><ul id="3e592be1-c41c-80dc-8ba2-cb3ec7adce0b" class="bulleted-list" dir="auto"><li style="list-style-type:disc">optimized image libraries when necessary</li></ul><h2 id="3e592be1-c41c-80f4-abca-c7e1957ad53b" class="" dir="auto">One-minute interview answer</h2><p id="3e592be1-c41c-805c-b185-c3b1a42380ed" class="" dir="auto">&quot;React Native allows us to build native Android and iOS applications using React and JavaScript or TypeScript. Our React code runs in a JavaScript runtime, while the actual UI and platform-specific functionality are handled by native Android and iOS code.</p><p id="3e592be1-c41c-8091-99ba-d29a08519fc3" class="" dir="auto">Historically, React Native used a Bridge for communication between JavaScript and native code. The Bridge serialized messages and communicated asynchronously, which could become a bottleneck for high-frequency communication.</p><p id="3e592be1-c41c-8021-8cfb-e300908cf392" class="" dir="auto">The New Architecture addresses this with JSI, Fabric, TurboModules and Codegen. JSI provides a more direct interface between JavaScript and native or C++ code. Fabric is the new rendering system, while TurboModules are the newer native module system and support things such as lazy loading. Codegen generates type-safe native interfaces from specifications.</p><p id="3e592be1-c41c-80d8-984c-d97c32a20f4f" class="" dir="auto">So, at a high level, React handles the application and component logic, JSI provides the JavaScript-to-native interface, Fabric handles rendering, TurboModules provide native functionality, and Android or iOS ultimately renders and executes the native functionality.&quot;</p><p id="3e592be1-c41c-809b-86b5-e8f882fb84db" class="" dir="auto">
-</p><p id="3e592be1-c41c-802a-af2e-cfddb983efa0" class="" dir="auto">One thing to memorize</p><p id="3e592be1-c41c-80fe-807e-f73212ec4361" class="" dir="auto">
-</p><figure id="3e592be1-c41c-80a8-bff6-ef84c3b7dada" class="image" data-notion-image="image%202.png" dir="ltr"><a href="image%202.png"><img style="width:624px" src="image%202.png"/></a></figure></div></article><span class="sans" style="font-size:14px;padding-top:2em"></span></body></html>
+  // Copy buttons
+  document.querySelectorAll('.code').forEach(function (block) {
+    var btn = block.querySelector('.copy');
+    var code = block.querySelector('pre');
+    if (!btn || !code) return;
+    btn.addEventListener('click', function () {
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(code.innerText).then(function () {
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 1500);
+      });
+    });
+  });
+
+  // Highlight the current section in the sidebar
+  var links = document.querySelectorAll('#toc a');
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window) {
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          links.forEach(function (a) { a.classList.remove('active'); });
+          var a = map[e.target.id];
+          if (a) a.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    document.querySelectorAll('main section').forEach(function (s) { obs.observe(s); });
+  }
+
+  // Close mobile contents after choosing a section
+  document.querySelectorAll('.mobile-toc a').forEach(function (a) {
+    a.addEventListener('click', function () { a.closest('details').open = false; });
+  });
+})();
+</script>
+</body>
+</html>
