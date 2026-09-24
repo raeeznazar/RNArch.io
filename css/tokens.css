@@ -1,0 +1,56 @@
+/*
+ * Design tokens
+ * -------------
+ * Every colour, font and radius used on the site lives here.
+ * Colours use light-dark(<light>, <dark>): the browser picks one based on
+ * `color-scheme`, which follows the OS setting or the theme toggle
+ * (see js/theme.js).
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Surfaces & text */
+  --bg:          light-dark(#fbfbfa, #0f1115);
+  --surface:     light-dark(#ffffff, #161a20);
+  --surface-2:   light-dark(#f3f4f6, #1d222a);
+  --text:        light-dark(#1f2328, #e6e8eb);
+  --text-muted:  light-dark(#57606a, #9aa4b2);
+  --border:      light-dark(#e4e6ea, #2a313b);
+
+  /* Semantic colours */
+  --accent:      light-dark(#0a7ea4, #4cc2e8);  /* JavaScript / links */
+  --accent-soft: light-dark(#e3f4fa, #10303b);
+  --old:         light-dark(#b54708, #f5a35c);  /* legacy architecture */
+  --old-soft:    light-dark(#fef3e7, #33230f);
+  --new:         light-dark(#067647, #4fd18b);  /* new architecture */
+  --new-soft:    light-dark(#e7f6ee, #10301f);
+  --warn-soft:   light-dark(#fdecea, #3a1714);
+
+  /* Code */
+  --code-bg:     light-dark(#f6f8fa, #12161c);
+  --code-text:   light-dark(#24292f, #d6dde6);
+  --tok-keyword: light-dark(#cf222e, #ff7b72);
+  --tok-type:    light-dark(#8250df, #d2a8ff);
+  --tok-string:  light-dark(#0a3069, #a5d6ff);
+  --tok-comment: light-dark(#6e7781, #8b949e);
+  --tok-fn:      light-dark(#0550ae, #79c0ff);
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 12px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
+}
+
+/* Explicit choice from the theme toggle overrides the OS setting. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; --shadow: none; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --shadow: none; }
+}

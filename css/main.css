@@ -1,0 +1,24 @@
+/*
+ * Stylesheet entry point
+ * ----------------------
+ * index.html loads only this file. Order matters:
+ * tokens → base → layout → components.
+ */
+
+@import url("tokens.css");
+@import url("base.css");
+@import url("layout.css");
+
+@import url("components/sidebar.css");
+@import url("components/diagram.css");
+@import url("components/code-block.css");
+@import url("components/callout.css");
+@import url("components/cards.css");
+@import url("components/table.css");
+@import url("components/answer.css");
+@import url("components/explainer.css");
+
+@media print {
+  .sidebar { display: none; }
+  .layout  { display: block; }
+}

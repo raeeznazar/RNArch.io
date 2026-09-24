@@ -1,0 +1,89 @@
+/*
+ * Page layout
+ * -----------
+ * Two columns on desktop (sidebar + article), a single column on mobile.
+ * Also holds the page header (hero) and section spacing.
+ */
+
+.layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 56px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.content {
+  min-width: 0;
+  max-width: 760px;
+  padding: 56px 0 96px;
+}
+
+/* ---------- Hero ---------- */
+
+.hero__eyebrow {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.hero__title {
+  font-size: clamp(2.1rem, 4.5vw, 2.9rem);
+  line-height: 1.12;
+  letter-spacing: -.025em;
+  font-weight: 800;
+  margin: 18px 0 16px;
+}
+
+.hero__lede {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  max-width: 640px;
+  margin: 0 0 28px;
+}
+
+/* ---------- Sections ---------- */
+
+.section { padding-top: 56px; }
+
+.section + .section {
+  border-top: 1px solid var(--border);
+  margin-top: 56px;
+}
+
+.section__num {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: .04em;
+}
+
+.footer {
+  margin-top: 72px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 0 16px;
+  }
+  .content {
+    max-width: none;
+    padding-top: 28px;
+  }
+}

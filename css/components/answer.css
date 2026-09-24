@@ -1,0 +1,22 @@
+/*
+ * Interview answer component
+ * --------------------------
+ * The quoted "one-minute answer" block.
+ */
+
+.answer {
+  margin: 22px 0;
+  padding: 26px 28px 10px;
+  font-size: 1.04rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.answer p { margin-bottom: 16px; }
+
+@media (max-width: 600px) {
+  .answer { padding: 20px 18px 6px; }
+}

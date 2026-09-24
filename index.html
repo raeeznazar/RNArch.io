@@ -1,955 +1,1183 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>React Native Architecture</title>
-<meta name="description" content="A structured guide to React Native's architecture: the old Bridge, the New Architecture (JSI, Fabric, TurboModules, Codegen), performance tips and a one-minute interview answer.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg: #fbfbfa;
-  --surface: #ffffff;
-  --surface-2: #f3f4f6;
-  --text: #1f2328;
-  --text-muted: #57606a;
-  --border: #e4e6ea;
-  --accent: #0a7ea4;
-  --accent-soft: #e3f4fa;
-  --old: #b54708;
-  --old-soft: #fef3e7;
-  --new: #067647;
-  --new-soft: #e7f6ee;
-  --warn: #b42318;
-  --warn-soft: #fdecea;
-  --code-bg: #f6f8fa;
-  --code-text: #24292f;
-  --tok-key: #cf222e;
-  --tok-type: #8250df;
-  --tok-str: #0a3069;
-  --tok-com: #6e7781;
-  --tok-fn: #0550ae;
-  --shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0f1115;
-    --surface: #161a20;
-    --surface-2: #1d222a;
-    --text: #e6e8eb;
-    --text-muted: #9aa4b2;
-    --border: #2a313b;
-    --accent: #4cc2e8;
-    --accent-soft: #10303b;
-    --old: #f5a35c;
-    --old-soft: #33230f;
-    --new: #4fd18b;
-    --new-soft: #10301f;
-    --warn: #ff8a80;
-    --warn-soft: #3a1714;
-    --code-bg: #12161c;
-    --code-text: #d6dde6;
-    --tok-key: #ff7b72;
-    --tok-type: #d2a8ff;
-    --tok-str: #a5d6ff;
-    --tok-com: #8b949e;
-    --tok-fn: #79c0ff;
-    --shadow: none;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0f1115;
-  --surface: #161a20;
-  --surface-2: #1d222a;
-  --text: #e6e8eb;
-  --text-muted: #9aa4b2;
-  --border: #2a313b;
-  --accent: #4cc2e8;
-  --accent-soft: #10303b;
-  --old: #f5a35c;
-  --old-soft: #33230f;
-  --new: #4fd18b;
-  --new-soft: #10301f;
-  --warn: #ff8a80;
-  --warn-soft: #3a1714;
-  --code-bg: #12161c;
-  --code-text: #d6dde6;
-  --tok-key: #ff7b72;
-  --tok-type: #d2a8ff;
-  --tok-str: #a5d6ff;
-  --tok-com: #8b949e;
-  --tok-fn: #79c0ff;
-  --shadow: none;
-}
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>React Native Architecture</title>
+    <meta
+      name="description"
+      content="A structured guide to React Native's architecture: the old Bridge, the New Architecture (JSI, Fabric, TurboModules, Codegen), performance tips and a one-minute interview answer."
+    />
 
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 24px; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 17px;
-  line-height: 1.7;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
-code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace; }
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
 
-/* ---------- Layout ---------- */
-.layout {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 56px;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 32px;
-}
-.sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-  padding: 40px 0 32px;
-}
-.brand {
-  display: flex; align-items: center; gap: 10px;
-  font-weight: 700; font-size: 15px; letter-spacing: -.01em;
-  margin-bottom: 28px; color: var(--text);
-}
-.brand-mark {
-  width: 28px; height: 28px; border-radius: 8px;
-  display: grid; place-items: center;
-  background: var(--accent-soft); color: var(--accent);
-}
-.toc-label {
-  font-size: 12px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: .08em; color: var(--text-muted); margin: 0 0 10px;
-}
-.toc { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
-.toc li { counter-increment: toc; }
-.toc a {
-  display: flex; gap: 10px;
-  padding: 6px 10px; margin-left: -10px;
-  border-radius: 6px;
-  font-size: 14.5px; line-height: 1.45;
-  color: var(--text-muted);
-  border-left: 2px solid transparent;
-}
-.toc a::before {
-  content: counter(toc, decimal-leading-zero);
-  font-family: "JetBrains Mono", monospace; font-size: 12px;
-  padding-top: 2px; opacity: .7;
-}
-.toc a:hover { color: var(--text); background: var(--surface-2); text-decoration: none; }
-.toc a.active { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
-.theme-toggle {
-  margin-top: 28px;
-  display: inline-flex; align-items: center; gap: 8px;
-  font: inherit; font-size: 13.5px; color: var(--text-muted);
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; padding: 7px 12px; cursor: pointer;
-}
-.theme-toggle:hover { color: var(--text); }
+    <!-- Styles (css/main.css imports everything else) -->
+    <link rel="stylesheet" href="css/main.css" />
 
-main { padding: 56px 0 96px; min-width: 0; max-width: 760px; }
-
-/* ---------- Hero ---------- */
-.eyebrow {
-  display: inline-block;
-  font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--accent); background: var(--accent-soft);
-  padding: 4px 10px; border-radius: 999px;
-}
-h1.title {
-  font-size: clamp(2.1rem, 4.5vw, 2.9rem);
-  line-height: 1.12; letter-spacing: -.025em; font-weight: 800;
-  margin: 18px 0 16px;
-}
-.lede { font-size: 1.15rem; color: var(--text-muted); margin: 0 0 28px; max-width: 640px; }
-.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-.chip {
-  font-size: 13px; font-weight: 500;
-  border: 1px solid var(--border); background: var(--surface);
-  border-radius: 999px; padding: 3px 11px; color: var(--text-muted);
-}
-
-/* ---------- Sections ---------- */
-section { padding-top: 56px; }
-section + section { border-top: 1px solid var(--border); margin-top: 56px; }
-.sec-num {
-  font-family: "JetBrains Mono", monospace; font-size: 13px; font-weight: 600;
-  color: var(--accent); letter-spacing: .04em;
-}
-h2 {
-  font-size: 1.85rem; line-height: 1.25; letter-spacing: -.02em; font-weight: 700;
-  margin: 6px 0 16px;
-}
-h3 {
-  font-size: 1.25rem; line-height: 1.35; letter-spacing: -.01em; font-weight: 650;
-  margin: 36px 0 10px;
-}
-p { margin: 0 0 16px; }
-strong { font-weight: 650; }
-ul.list { margin: 0 0 18px; padding-left: 1.25em; }
-ul.list li { margin: 4px 0; padding-left: 4px; }
-ul.list li::marker { color: var(--accent); }
-
-:not(pre) > code {
-  font-size: .86em;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  padding: 1px 6px; border-radius: 5px;
-  white-space: nowrap;
-}
-
-/* ---------- Code blocks ---------- */
-.code {
-  margin: 18px 0 24px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--code-bg);
-  overflow: hidden;
-}
-.code-head {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 14px; border-bottom: 1px solid var(--border);
-  font-size: 12.5px; color: var(--text-muted);
-  font-family: "JetBrains Mono", monospace;
-}
-.copy {
-  font: inherit; font-size: 12px; cursor: pointer;
-  background: transparent; color: var(--text-muted);
-  border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px;
-}
-.copy:hover { color: var(--text); }
-.code pre {
-  margin: 0; padding: 16px 18px; overflow-x: auto;
-  font-size: 14px; line-height: 1.65; color: var(--code-text);
-}
-.k { color: var(--tok-key); }
-.t { color: var(--tok-type); }
-.s { color: var(--tok-str); }
-.c { color: var(--tok-com); font-style: italic; }
-.f { color: var(--tok-fn); }
-
-/* ---------- Callouts ---------- */
-.callout {
-  display: flex; gap: 14px;
-  margin: 22px 0;
-  padding: 16px 18px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-.callout-icon { flex: none; font-size: 18px; line-height: 1.5; }
-.callout p:last-child { margin-bottom: 0; }
-.callout-title { font-weight: 650; margin-bottom: 4px; }
-.callout.tip { background: var(--accent-soft); border-color: transparent; }
-.callout.warn { background: var(--warn-soft); border-color: transparent; }
-.callout.good { background: var(--new-soft); border-color: transparent; }
-
-/* ---------- Diagrams ---------- */
-.diagram {
-  margin: 22px 0 28px;
-  padding: 26px 20px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-.diagram-caption {
-  text-align: center; font-size: 13.5px; color: var(--text-muted);
-  margin-top: 18px;
-}
-.flow { display: flex; flex-direction: column; align-items: center; }
-.flow.row { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 0; }
-.node {
-  min-width: 170px; max-width: 100%;
-  text-align: center;
-  padding: 10px 16px;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  font-weight: 600; font-size: 15px; line-height: 1.35;
-}
-.node small { display: block; font-weight: 400; font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-.node.js { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
-.node.old { background: var(--old-soft); border-color: color-mix(in srgb, var(--old) 35%, transparent); color: var(--old); }
-.node.new { background: var(--new-soft); border-color: color-mix(in srgb, var(--new) 35%, transparent); color: var(--new); }
-.node.native { background: var(--surface-2); }
-.node.dashed { border-style: dashed; background: transparent; color: var(--text-muted); font-weight: 500; }
-.arrow {
-  position: relative; width: 2px; height: 30px;
-  background: var(--border); margin: 3px 0 7px;
-}
-.arrow::after {
-  content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
-  border: 6px solid transparent; border-top: 7px solid var(--border); border-bottom: 0;
-}
-.arrow.both::before {
-  content: ""; position: absolute; left: 50%; top: -6px; transform: translateX(-50%);
-  border: 6px solid transparent; border-bottom: 7px solid var(--border); border-top: 0;
-}
-.arrow-label {
-  font-size: 12.5px; color: var(--text-muted); font-family: "JetBrains Mono", monospace;
-  margin: -2px 0 2px;
-}
-.h-arrow { align-self: center; color: var(--text-muted); padding: 0 10px; font-size: 18px; }
-
-.layer {
-  width: 100%; max-width: 460px;
-  border-radius: 12px; padding: 14px 18px;
-  border: 1px solid var(--border);
-}
-.layer-title { font-weight: 700; font-size: 15.5px; margin-bottom: 8px; }
-.layer .tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.layer .tags span {
-  font-size: 13px; padding: 2px 9px; border-radius: 6px;
-  background: var(--surface); border: 1px solid var(--border);
-}
-.layer.l-js { background: var(--accent-soft); }
-.layer.l-rt { background: var(--new-soft); }
-.layer.l-na { background: var(--surface-2); }
-
-.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.split > .col { display: flex; flex-direction: column; align-items: center; }
-.col-label {
-  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-  margin-bottom: 12px; padding: 2px 10px; border-radius: 999px;
-}
-.col-label.old { color: var(--old); background: var(--old-soft); }
-.col-label.new { color: var(--new); background: var(--new-soft); }
-
-.branch { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; width: 100%; max-width: 440px; }
-.branch > div { display: flex; flex-direction: column; align-items: center; }
-.fork {
-  width: 50%; height: 16px; margin: 0 auto;
-  border: 2px solid var(--border); border-bottom: 0; border-radius: 8px 8px 0 0;
-}
-.join {
-  width: 50%; height: 16px; margin: 0 auto;
-  border: 2px solid var(--border); border-top: 0; border-radius: 0 0 8px 8px;
-}
-
-/* ---------- Cards ---------- */
-.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 22px 0 8px; }
-.card {
-  border: 1px solid var(--border); border-radius: 12px;
-  padding: 16px 18px; background: var(--surface); box-shadow: var(--shadow);
-}
-a.card { color: inherit; display: block; }
-a.card:hover { text-decoration: none; border-color: var(--accent); }
-.card-kicker { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
-.card-title { font-size: 1.1rem; font-weight: 700; margin: 2px 0 4px; }
-.card p { font-size: 15px; color: var(--text-muted); margin: 0; line-height: 1.55; }
-
-/* ---------- Tables ---------- */
-.table-wrap { overflow-x: auto; margin: 20px 0 28px; border: 1px solid var(--border); border-radius: 10px; }
-table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.5; }
-th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
-th { background: var(--surface-2); font-weight: 650; font-size: 13.5px; }
-tr:last-child td { border-bottom: 0; }
-td:first-child { font-weight: 600; white-space: nowrap; }
-th.old { color: var(--old); }
-th.new { color: var(--new); }
-
-/* ---------- Interview answer ---------- */
-.answer {
-  position: relative;
-  margin: 22px 0;
-  padding: 26px 28px 10px;
-  border-radius: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--accent);
-  box-shadow: var(--shadow);
-  font-size: 1.04rem;
-}
-.answer p { margin-bottom: 16px; }
-
-.cheat {
-  display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin: 20px 0;
-}
-.cheat div {
-  border-radius: 10px; padding: 14px; text-align: center;
-  background: var(--surface); border: 1px solid var(--border);
-}
-.cheat b { display: block; font-size: 1.05rem; }
-.cheat span { font-size: 13.5px; color: var(--text-muted); }
-
-footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
-
-/* ---------- Mobile ---------- */
-.mobile-toc { display: none; }
-@media (max-width: 960px) {
-  .layout { grid-template-columns: minmax(0,1fr); gap: 0; padding: 0 16px; }
-  .sidebar { display: none; }
-  main { padding-top: 28px; max-width: none; }
-  .mobile-toc {
-    display: block; margin: 24px 0 0;
-    border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
-  }
-  .mobile-toc summary { padding: 12px 16px; font-weight: 600; cursor: pointer; font-size: 15px; }
-  .mobile-toc .toc { padding: 0 16px 12px 26px; }
-  .mobile-toc .theme-toggle { margin: 0 16px 14px; }
-}
-@media (max-width: 600px) {
-  body { font-size: 16.5px; }
-  h2 { font-size: 1.55rem; }
-  .cards, .split, .cheat { grid-template-columns: minmax(0,1fr); }
-  .cheat { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .split { gap: 28px; }
-  .node { min-width: 140px; font-size: 14.5px; }
-  .answer { padding: 20px 18px 6px; }
-  .diagram { padding: 22px 12px; }
-}
-@media print {
-  .sidebar, .mobile-toc, .copy { display: none; }
-  .layout { display: block; }
-}
-</style>
-</head>
-<body>
-<div class="layout">
-
-  <aside class="sidebar" aria-label="Table of contents">
-    <div class="brand"><span class="brand-mark">⚛</span> RN Architecture</div>
-    <p class="toc-label">On this page</p>
-    <ol class="toc" id="toc">
-      <li><a href="#overview">Overview</a></li>
-      <li><a href="#bridge">Old architecture: the Bridge</a></li>
-      <li><a href="#new-architecture">The New Architecture</a></li>
-      <li><a href="#jsi">JSI</a></li>
-      <li><a href="#fabric">Fabric</a></li>
-      <li><a href="#turbomodules">TurboModules</a></li>
-      <li><a href="#codegen">Codegen</a></li>
-      <li><a href="#big-picture">Putting it together</a></li>
-      <li><a href="#performance">Performance</a></li>
-      <li><a href="#interview">One-minute answer</a></li>
-    </ol>
-    <button class="theme-toggle" type="button" data-theme-toggle>◐ Toggle theme</button>
-  </aside>
-
-  <main>
-    <header>
-      <span class="eyebrow">Study notes</span>
-      <h1 class="title">React Native Architecture</h1>
-      <p class="lede">How JavaScript talks to native Android and iOS, why the old Bridge was replaced, and what JSI, Fabric, TurboModules and Codegen each do. Written for interview preparation.</p>
-      <div class="meta">
-        <span class="chip">~12 min read</span>
-        <span class="chip">Bridge → JSI</span>
-        <span class="chip">Interview ready</span>
-      </div>
-
-      <details class="mobile-toc">
-        <summary>Contents</summary>
-        <ol class="toc">
-          <li><a href="#overview">Overview</a></li>
-          <li><a href="#bridge">Old architecture: the Bridge</a></li>
-          <li><a href="#new-architecture">The New Architecture</a></li>
-          <li><a href="#jsi">JSI</a></li>
-          <li><a href="#fabric">Fabric</a></li>
-          <li><a href="#turbomodules">TurboModules</a></li>
-          <li><a href="#codegen">Codegen</a></li>
-          <li><a href="#big-picture">Putting it together</a></li>
-          <li><a href="#performance">Performance</a></li>
-          <li><a href="#interview">One-minute answer</a></li>
-        </ol>
-        <button class="theme-toggle" type="button" data-theme-toggle>◐ Toggle theme</button>
-      </details>
-    </header>
-
-    <!-- 01 -->
-    <section id="overview">
-      <div class="sec-num">01</div>
-      <h2>Overview</h2>
-      <p>React Native lets us build <strong>native mobile applications</strong> using JavaScript/TypeScript and React. The JavaScript code runs inside a JavaScript engine (Hermes by default), and React Native connects that code to native Android and iOS functionality.</p>
-      <p>Unlike React for the web, which renders HTML elements, React Native renders <strong>real native UI components</strong>. A <code>&lt;View&gt;</code> becomes an Android <code>ViewGroup</code> or an iOS <code>UIView</code>.</p>
-
-      <h3>The three layers</h3>
-      <p>Think of a React Native app as three major areas stacked on top of each other:</p>
-      <figure class="diagram">
-        <div class="flow">
-          <div class="layer l-js">
-            <div class="layer-title">JavaScript</div>
-            <div class="tags"><span>React components</span><span>Business logic</span><span>State management</span><span>API calls</span></div>
-          </div>
-          <div class="arrow both"></div>
-          <div class="arrow-label">communication</div>
-          <div class="layer l-rt">
-            <div class="layer-title">React Native runtime</div>
-            <div class="tags"><span>JSI</span><span>Bridge (legacy)</span><span>Fabric</span><span>TurboModules</span></div>
-          </div>
-          <div class="arrow both"></div>
-          <div class="layer l-na">
-            <div class="layer-title">Native platform</div>
-            <div class="tags"><span>Android / iOS</span><span>UI</span><span>Camera</span><span>GPS</span><span>Storage</span><span>Sensors</span><span>Bluetooth</span></div>
-          </div>
+    <!-- Theme runs first to avoid a flash of the wrong colours -->
+    <script src="js/theme.js"></script>
+    <script src="js/sidebar.js" defer></script>
+    <script src="js/copy-code.js" defer></script>
+    <script src="js/explainer.js" defer></script>
+  </head>
+  <body>
+    <div class="layout">
+      <!-- ============ SIDEBAR ============ -->
+      <aside class="sidebar" aria-label="Table of contents">
+        <div class="sidebar__brand">
+          <span class="sidebar__logo">⚛</span>
+          RN Architecture
+          <button class="sidebar__menu-btn" type="button" aria-expanded="false">
+            Contents
+          </button>
         </div>
-        <figcaption class="diagram-caption">The runtime in the middle is what changed between the old and new architecture.</figcaption>
-      </figure>
-    </section>
 
-    <!-- 02 -->
-    <section id="bridge">
-      <div class="sec-num">02</div>
-      <h2>Old architecture: the Bridge</h2>
-      <p>The old architecture was built around a single component: <strong>the Bridge</strong>. Every interaction between JavaScript and native code had to cross it.</p>
+        <nav class="sidebar__nav">
+          <p class="sidebar__label">On this page</p>
+          <ol class="toc">
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#bridge">Old architecture: the Bridge</a></li>
+            <li><a href="#new-architecture">The New Architecture</a></li>
+            <li><a href="#jsi">JSI</a></li>
+            <li><a href="#fabric">Fabric</a></li>
+            <li><a href="#turbomodules">TurboModules</a></li>
+            <li><a href="#codegen">Codegen</a></li>
+            <li><a href="#big-picture">Putting it together</a></li>
+            <li><a href="#performance">Performance</a></li>
+            <li><a href="#interview">One-minute answer</a></li>
+          </ol>
+          <button class="theme-toggle" type="button" data-theme-toggle>
+            ◐ Toggle theme
+          </button>
+        </nav>
+      </aside>
 
-      <figure class="diagram">
-        <div class="split">
-          <div class="col">
-            <span class="col-label old">Concept</span>
-            <div class="node js">JavaScript</div>
-            <div class="arrow both"></div>
-            <div class="node old">Bridge</div>
-            <div class="arrow both"></div>
-            <div class="node native">Native</div>
+      <main class="content">
+        <!-- ============ HERO ============ -->
+        <header class="hero">
+          <span class="hero__eyebrow">Study notes</span>
+          <h1 class="hero__title">React Native Architecture</h1>
+          <p class="hero__lede">
+            How JavaScript talks to native Android and iOS, why the old Bridge
+            was replaced, and what JSI, Fabric, TurboModules and Codegen each
+            do. Written for interview preparation.
+          </p>
+          <div class="chips">
+            <span class="chip">~12 min read</span>
+            <span class="chip">Bridge → JSI</span>
+            <span class="chip">Interview ready</span>
           </div>
-          <div class="col">
-            <span class="col-label old">Example</span>
-            <div class="node js">JS<small>"Open the camera"</small></div>
-            <div class="arrow"></div>
-            <div class="node old">Bridge</div>
-            <div class="arrow"></div>
-            <div class="node native">Native Camera API</div>
-          </div>
-        </div>
-      </figure>
+        </header>
 
-      <p>The Bridge used <strong>asynchronous, serialized communication</strong>. Data had to be converted into JSON-like messages before crossing the boundary and parsed again on the other side.</p>
+        <!-- ============ 01 · OVERVIEW ============ -->
+        <section class="section" id="overview">
+          <div class="section__num">01</div>
+          <h2>Overview</h2>
+          <p>
+            React Native lets us build
+            <strong>native mobile applications</strong> using
+            JavaScript/TypeScript and React. The JavaScript code runs inside a
+            JavaScript engine (Hermes by default), and React Native connects
+            that code to native Android and iOS functionality.
+          </p>
+          <p>
+            Unlike React for the web, which renders HTML elements, React Native
+            renders <strong>real native UI components</strong>. A
+            <code>&lt;View&gt;</code> becomes an Android
+            <code>ViewGroup</code> or an iOS <code>UIView</code>.
+          </p>
 
-      <h3>Why was the Bridge a problem?</h3>
-      <p>Imagine calling a native module with a small object:</p>
-      <div class="code">
-        <div class="code-head"><span>JavaScript</span><button class="copy" type="button">Copy</button></div>
-<pre><code>NativeModule.<span class="f">doSomething</span>({
-  userId: <span class="t">123</span>,
-  name: <span class="s">"John"</span>,
+          <h3>The three layers</h3>
+          <p>
+            Think of a React Native app as three major areas stacked on top of
+            each other:
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="layer layer--js">
+                <div class="layer__title">JavaScript</div>
+                <div class="layer__tags">
+                  <span>React components</span><span>Business logic</span
+                  ><span>State management</span><span>API calls</span>
+                </div>
+              </div>
+              <div class="arrow arrow--both"></div>
+              <div class="arrow__label">communication</div>
+              <div class="layer layer--runtime">
+                <div class="layer__title">React Native runtime</div>
+                <div class="layer__tags">
+                  <span>JSI</span><span>Bridge (legacy)</span><span>Fabric</span
+                  ><span>TurboModules</span>
+                </div>
+              </div>
+              <div class="arrow arrow--both"></div>
+              <div class="layer layer--native">
+                <div class="layer__title">Native platform</div>
+                <div class="layer__tags">
+                  <span>Android / iOS</span><span>UI</span><span>Camera</span
+                  ><span>GPS</span><span>Storage</span><span>Sensors</span
+                  ><span>Bluetooth</span>
+                </div>
+              </div>
+            </div>
+            <figcaption class="diagram__caption">
+              The runtime in the middle is what changed between the old and new
+              architecture.
+            </figcaption>
+          </figure>
+        </section>
+
+        <!-- ============ 02 · THE BRIDGE ============ -->
+        <section class="section" id="bridge">
+          <div class="section__num">02</div>
+          <h2>Old architecture: the Bridge</h2>
+          <p>
+            The old architecture was built around a single component:
+            <strong>the Bridge</strong>. Every interaction between JavaScript
+            and native code had to cross it.
+          </p>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--old">Concept</span>
+                <div class="node node--js">JavaScript</div>
+                <div class="arrow arrow--both"></div>
+                <div class="node node--old">Bridge</div>
+                <div class="arrow arrow--both"></div>
+                <div class="node">Native</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--old">Example</span>
+                <div class="node node--js">
+                  JS<small>"Open the camera"</small>
+                </div>
+                <div class="arrow"></div>
+                <div class="node node--old">Bridge</div>
+                <div class="arrow"></div>
+                <div class="node">Native Camera API</div>
+              </div>
+            </div>
+          </figure>
+
+          <p>
+            The Bridge used
+            <strong>asynchronous, serialized communication</strong>. Data had to
+            be converted into JSON-like messages before crossing the boundary
+            and parsed again on the other side.
+          </p>
+
+          <h3>Why was the Bridge a problem?</h3>
+          <p>Imagine calling a native module with a small object:</p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>JavaScript</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code>NativeModule.<span class="tok-fn">doSomething</span>({
+  userId: <span class="tok-type">123</span>,
+  name: <span class="tok-string">"John"</span>,
 });</code></pre>
-      </div>
-      <p>Even this simple call has to travel through several steps:</p>
-      <figure class="diagram">
-        <div class="flow">
-          <div class="node js">JavaScript</div>
-          <div class="arrow"></div>
-          <div class="node old">Serialize data<small>object → JSON string</small></div>
-          <div class="arrow"></div>
-          <div class="node old">Bridge<small>async message queue</small></div>
-          <div class="arrow"></div>
-          <div class="node old">Deserialize data<small>JSON string → native types</small></div>
-          <div class="arrow"></div>
-          <div class="node native">Native API</div>
-        </div>
-      </figure>
-      <p>One call is cheap. <strong>Thousands of calls per second</strong> are not. The cost becomes noticeable with:</p>
-      <ul class="list">
-        <li>animations</li>
-        <li>gestures</li>
-        <li>large lists</li>
-        <li>high-frequency events (scroll, sensors)</li>
-        <li>complex native modules</li>
-        <li>large amounts of data crossing the JS/native boundary</li>
-      </ul>
-      <div class="callout warn">
-        <div class="callout-icon">⚠️</div>
-        <div><p class="callout-title">Key limitation</p><p>Because everything was asynchronous and serialized, JavaScript could never call native code synchronously, and a busy Bridge meant dropped frames. The Bridge became one of the biggest architectural bottlenecks.</p></div>
-      </div>
-    </section>
-
-    <!-- 03 -->
-    <section id="new-architecture">
-      <div class="sec-num">03</div>
-      <h2>The New Architecture</h2>
-      <p>The New Architecture was introduced to remove these limitations. It is enabled by default since React Native 0.76. It rests on four technologies:</p>
-
-      <div class="cards">
-        <a class="card" href="#jsi"><div class="card-kicker">Foundation</div><div class="card-title">JSI</div><p>A direct interface between JavaScript and C++/native code. No serialization.</p></a>
-        <a class="card" href="#fabric"><div class="card-kicker">Rendering</div><div class="card-title">Fabric</div><p>The new rendering system that coordinates React with native UI.</p></a>
-        <a class="card" href="#turbomodules"><div class="card-kicker">Native modules</div><div class="card-title">TurboModules</div><p>The new native module system, built on JSI and loaded lazily.</p></a>
-        <a class="card" href="#codegen"><div class="card-kicker">Type safety</div><div class="card-title">Codegen</div><p>Generates type-safe native interfaces from TypeScript specs.</p></a>
-      </div>
-
-      <div class="callout tip">
-        <div class="callout-icon">💡</div>
-        <div><p class="callout-title">Remember this for your interview</p><p><strong>JSI</strong> is the foundation, <strong>Fabric</strong> is the new rendering system, <strong>TurboModules</strong> are the new native module system, and <strong>Codegen</strong> provides type-safe native interfaces.</p></div>
-      </div>
-    </section>
-
-    <!-- 04 -->
-    <section id="jsi">
-      <div class="sec-num">04</div>
-      <h2>JSI: JavaScript Interface</h2>
-      <p>JSI is a lightweight C++ API that lets JavaScript interact <strong>directly</strong> with C++ and native code, without relying on the old asynchronous Bridge.</p>
-
-      <figure class="diagram">
-        <div class="split">
-          <div class="col">
-            <span class="col-label old">Before</span>
-            <div class="node js">JS</div>
-            <div class="arrow"></div>
-            <div class="node old">Serialize → Bridge → Deserialize</div>
-            <div class="arrow"></div>
-            <div class="node native">Native</div>
           </div>
-          <div class="col">
-            <span class="col-label new">With JSI</span>
-            <div class="node js">JS</div>
-            <div class="arrow both"></div>
-            <div class="node new">JSI</div>
-            <div class="arrow both"></div>
-            <div class="node native">C++ / Native</div>
+
+          <p>Even this simple call has to travel through several steps:</p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">JavaScript</div>
+              <div class="arrow"></div>
+              <div class="node node--old">
+                Serialize data<small>object → JSON string</small>
+              </div>
+              <div class="arrow"></div>
+              <div class="node node--old">
+                Bridge<small>async message queue</small>
+              </div>
+              <div class="arrow"></div>
+              <div class="node node--old">
+                Deserialize data<small>JSON string → native types</small>
+              </div>
+              <div class="arrow"></div>
+              <div class="node">Native API</div>
+            </div>
+          </figure>
+
+          <p>
+            One call is cheap.
+            <strong>Thousands of calls per second</strong> are not. The cost
+            becomes noticeable with:
+          </p>
+          <ul>
+            <li>animations</li>
+            <li>gestures</li>
+            <li>large lists</li>
+            <li>high-frequency events (scroll, sensors)</li>
+            <li>complex native modules</li>
+            <li>large amounts of data crossing the JS/native boundary</li>
+          </ul>
+
+          <div class="callout callout--warn">
+            <div class="callout__icon">⚠️</div>
+            <div>
+              <p class="callout__title">Key limitation</p>
+              <p>
+                Because everything was asynchronous and serialized, JavaScript
+                could never call native code synchronously, and a busy Bridge
+                meant dropped frames. The Bridge became one of the biggest
+                architectural bottlenecks.
+              </p>
+            </div>
           </div>
-        </div>
-      </figure>
+        </section>
 
-      <p>With JSI, JavaScript can hold <strong>references to C++ objects</strong> and call their methods directly. This gives us:</p>
-      <ul class="list">
-        <li><strong>No serialization overhead</strong>: data is not converted to JSON to cross the boundary.</li>
-        <li><strong>Synchronous calls</strong> when needed, as well as asynchronous ones.</li>
-        <li><strong>Engine independence</strong>: JSI is an abstraction, so React Native can run on Hermes, JavaScriptCore, or other engines.</li>
-      </ul>
-    </section>
+        <!-- ============ 03 · NEW ARCHITECTURE ============ -->
+        <section class="section" id="new-architecture">
+          <div class="section__num">03</div>
+          <h2>The New Architecture</h2>
+          <p>
+            The New Architecture was introduced to remove these limitations. It
+            is enabled by default since React Native 0.76. It rests on four
+            technologies:
+          </p>
 
-    <!-- 05 -->
-    <section id="fabric">
-      <div class="sec-num">05</div>
-      <h2>Fabric</h2>
-      <p>Fabric is React Native's <strong>new rendering system</strong>. It is responsible for coordinating React's rendering with native UI.</p>
-
-      <figure class="diagram">
-        <div class="split">
-          <div class="col">
-            <span class="col-label old">Old rendering</span>
-            <div class="node js">React</div>
-            <div class="arrow"></div>
-            <div class="node">Shadow Tree</div>
-            <div class="arrow"></div>
-            <div class="node old">Bridge</div>
-            <div class="arrow"></div>
-            <div class="node native">Native UI</div>
+          <div class="cards">
+            <a class="card" href="#jsi">
+              <div class="card__kicker">Foundation</div>
+              <div class="card__title">JSI</div>
+              <p>
+                A direct interface between JavaScript and C++/native code. No
+                serialization.
+              </p>
+            </a>
+            <a class="card" href="#fabric">
+              <div class="card__kicker">Rendering</div>
+              <div class="card__title">Fabric</div>
+              <p>
+                The new rendering system that coordinates React with native UI.
+              </p>
+            </a>
+            <a class="card" href="#turbomodules">
+              <div class="card__kicker">Native modules</div>
+              <div class="card__title">TurboModules</div>
+              <p>
+                The new native module system, built on JSI and loaded lazily.
+              </p>
+            </a>
+            <a class="card" href="#codegen">
+              <div class="card__kicker">Type safety</div>
+              <div class="card__title">Codegen</div>
+              <p>
+                Generates type-safe native interfaces from TypeScript specs.
+              </p>
+            </a>
           </div>
-          <div class="col">
-            <span class="col-label new">Fabric</span>
-            <div class="node js">React</div>
-            <div class="arrow"></div>
-            <div class="node new">Fabric<small>C++ Shadow Tree via JSI</small></div>
-            <div class="arrow"></div>
-            <div class="node native">Native UI</div>
+
+          <div class="callout callout--tip">
+            <div class="callout__icon">💡</div>
+            <div>
+              <p class="callout__title">Remember this for your interview</p>
+              <p>
+                <strong>JSI</strong> is the foundation,
+                <strong>Fabric</strong> is the new rendering system,
+                <strong>TurboModules</strong> are the new native module system,
+                and <strong>Codegen</strong> provides type-safe native
+                interfaces.
+              </p>
+            </div>
           </div>
-        </div>
-      </figure>
+        </section>
 
-      <p>Because the shadow tree now lives in shared C++ and is reached through JSI, Fabric brings improvements in:</p>
-      <ul class="list">
-        <li>rendering performance</li>
-        <li>responsiveness</li>
-        <li>support for concurrent React features (e.g. <code>startTransition</code>, Suspense)</li>
-        <li>synchronous layout and rendering where appropriate</li>
-        <li>better interoperability with native components</li>
-      </ul>
-    </section>
+        <!-- ============ 04 · JSI ============ -->
+        <section class="section" id="jsi">
+          <div class="section__num">04</div>
+          <h2>JSI: JavaScript Interface</h2>
+          <p>
+            JSI is a lightweight C++ API that lets JavaScript interact
+            <strong>directly</strong> with C++ and native code, without relying
+            on the old asynchronous Bridge.
+          </p>
 
-    <!-- 06 -->
-    <section id="turbomodules">
-      <div class="sec-num">06</div>
-      <h2>TurboModules</h2>
-      <p>TurboModules replace the older <strong>Native Modules</strong> system. Native modules are how JavaScript reaches platform capabilities such as:</p>
-      <div class="meta" style="margin-bottom:18px">
-        <span class="chip">GPS</span><span class="chip">Camera</span><span class="chip">Bluetooth</span><span class="chip">Secure Storage</span><span class="chip">File System</span>
-      </div>
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--old">Before</span>
+                <div class="node node--js">JS</div>
+                <div class="arrow"></div>
+                <div class="node node--old">
+                  Serialize → Bridge → Deserialize
+                </div>
+                <div class="arrow"></div>
+                <div class="node">Native</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--new">With JSI</span>
+                <div class="node node--js">JS</div>
+                <div class="arrow arrow--both"></div>
+                <div class="node node--new">JSI</div>
+                <div class="arrow arrow--both"></div>
+                <div class="node">C++ / Native</div>
+              </div>
+            </div>
+          </figure>
 
-      <figure class="diagram">
-        <div class="split">
-          <div class="col">
-            <span class="col-label old">Previously</span>
-            <div class="node js">JavaScript</div>
-            <div class="arrow"></div>
-            <div class="node old">Bridge</div>
-            <div class="arrow"></div>
-            <div class="node native">Native Module</div>
+          <p>
+            With JSI, JavaScript can hold
+            <strong>references to C++ objects</strong> and call their methods
+            directly. This gives us:
+          </p>
+          <ul>
+            <li>
+              <strong>No serialization overhead</strong>: data is not converted
+              to JSON to cross the boundary.
+            </li>
+            <li>
+              <strong>Synchronous calls</strong> when needed, as well as
+              asynchronous ones.
+            </li>
+            <li>
+              <strong>Engine independence</strong>: JSI is an abstraction, so
+              React Native can run on Hermes, JavaScriptCore, or other engines.
+            </li>
+          </ul>
+        </section>
+
+        <!-- ============ 05 · FABRIC ============ -->
+        <section class="section" id="fabric">
+          <div class="section__num">05</div>
+          <h2>Fabric</h2>
+          <p>
+            Fabric is React Native's <strong>new rendering system</strong>. It
+            is responsible for coordinating React's rendering with native UI.
+          </p>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--old">Old rendering</span>
+                <div class="node node--js">React</div>
+                <div class="arrow"></div>
+                <div class="node">Shadow Tree</div>
+                <div class="arrow"></div>
+                <div class="node node--old">Bridge</div>
+                <div class="arrow"></div>
+                <div class="node">Native UI</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--new">Fabric</span>
+                <div class="node node--js">React</div>
+                <div class="arrow"></div>
+                <div class="node node--new">
+                  Fabric<small>C++ Shadow Tree via JSI</small>
+                </div>
+                <div class="arrow"></div>
+                <div class="node">Native UI</div>
+              </div>
+            </div>
+          </figure>
+
+          <p>
+            Because the shadow tree now lives in shared C++ and is reached
+            through JSI, Fabric brings improvements in:
+          </p>
+          <ul>
+            <li>rendering performance</li>
+            <li>responsiveness</li>
+            <li>
+              support for concurrent React features (e.g.
+              <code>startTransition</code>, Suspense)
+            </li>
+            <li>synchronous layout and rendering where appropriate</li>
+            <li>better interoperability with native components</li>
+          </ul>
+        </section>
+
+        <!-- ============ 06 · TURBOMODULES ============ -->
+        <section class="section" id="turbomodules">
+          <div class="section__num">06</div>
+          <h2>TurboModules</h2>
+          <p>
+            TurboModules replace the older
+            <strong>Native Modules</strong> system. Native modules are how
+            JavaScript reaches platform capabilities such as:
+          </p>
+          <div class="chips">
+            <span class="chip">GPS</span>
+            <span class="chip">Camera</span>
+            <span class="chip">Bluetooth</span>
+            <span class="chip">Secure Storage</span>
+            <span class="chip">File System</span>
           </div>
-          <div class="col">
-            <span class="col-label new">TurboModules</span>
-            <div class="node js">JavaScript</div>
-            <div class="arrow"></div>
-            <div class="node new">JSI</div>
-            <div class="arrow"></div>
-            <div class="node new">TurboModule</div>
-            <div class="arrow"></div>
-            <div class="node native">Native API</div>
+
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--old">Previously</span>
+                <div class="node node--js">JavaScript</div>
+                <div class="arrow"></div>
+                <div class="node node--old">Bridge</div>
+                <div class="arrow"></div>
+                <div class="node">Native Module</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--new">TurboModules</span>
+                <div class="node node--js">JavaScript</div>
+                <div class="arrow"></div>
+                <div class="node node--new">JSI</div>
+                <div class="arrow"></div>
+                <div class="node node--new">TurboModule</div>
+                <div class="arrow"></div>
+                <div class="node">Native API</div>
+              </div>
+            </div>
+          </figure>
+
+          <h3>The big win: lazy loading</h3>
+          <p>
+            In the old system,
+            <strong>every native module was initialized at app startup</strong>,
+            whether it was used or not. TurboModules are loaded
+            <strong>only when they are first needed</strong>.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th class="col-old">Old Native Modules</th>
+                  <th class="col-new">TurboModules</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>At startup</td>
+                  <td>App starts → load all 100 modules</td>
+                  <td>App starts → load nothing extra</td>
+                </tr>
+                <tr>
+                  <td>On first use</td>
+                  <td>Already loaded</td>
+                  <td>Module is loaded on demand</td>
+                </tr>
+                <tr>
+                  <td>Result</td>
+                  <td>Slower startup, more memory</td>
+                  <td>Faster startup, less memory</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
-      </figure>
+        </section>
 
-      <h3>The big win: lazy loading</h3>
-      <p>In the old system, <strong>every native module was initialized at app startup</strong>, whether it was used or not. TurboModules are loaded <strong>only when they are first needed</strong>.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th></th><th class="old">Old Native Modules</th><th class="new">TurboModules</th></tr></thead>
-          <tbody>
-            <tr><td>At startup</td><td>App starts → load all 100 modules</td><td>App starts → load nothing extra</td></tr>
-            <tr><td>On first use</td><td>Already loaded</td><td>Module is loaded on demand</td></tr>
-            <tr><td>Result</td><td>Slower startup, more memory</td><td>Faster startup, less memory</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+        <!-- ============ 07 · CODEGEN ============ -->
+        <section class="section" id="codegen">
+          <div class="section__num">07</div>
+          <h2>Codegen</h2>
+          <p>
+            Codegen generates the native "glue" code from a
+            <strong>typed JavaScript/TypeScript specification</strong>, so the
+            JS side and native side always agree on the interface.
+          </p>
+          <p>You describe the module once in TypeScript:</p>
 
-    <!-- 07 -->
-    <section id="codegen">
-      <div class="sec-num">07</div>
-      <h2>Codegen</h2>
-      <p>Codegen generates the native "glue" code from a <strong>typed JavaScript/TypeScript specification</strong>, so the JS side and native side always agree on the interface.</p>
-      <p>You describe the module once in TypeScript:</p>
-      <div class="code">
-        <div class="code-head"><span>NativeStorage.ts</span><button class="copy" type="button">Copy</button></div>
-<pre><code><span class="k">import type</span> { <span class="t">TurboModule</span> } <span class="k">from</span> <span class="s">'react-native'</span>;
-<span class="k">import</span> { TurboModuleRegistry } <span class="k">from</span> <span class="s">'react-native'</span>;
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>NativeStorage.ts</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code><span class="tok-keyword">import type</span> { <span class="tok-type">TurboModule</span> } <span class="tok-keyword">from</span> <span class="tok-string">'react-native'</span>;
+<span class="tok-keyword">import</span> { TurboModuleRegistry } <span class="tok-keyword">from</span> <span class="tok-string">'react-native'</span>;
 
-<span class="k">export interface</span> <span class="t">Spec</span> <span class="k">extends</span> <span class="t">TurboModule</span> {
-  <span class="f">getItem</span>(key: <span class="t">string</span>): <span class="t">Promise</span>&lt;<span class="t">string</span>&gt;;
-  <span class="f">setItem</span>(key: <span class="t">string</span>, value: <span class="t">string</span>): <span class="t">Promise</span>&lt;<span class="t">void</span>&gt;;
+<span class="tok-keyword">export interface</span> <span class="tok-type">Spec</span> <span class="tok-keyword">extends</span> <span class="tok-type">TurboModule</span> {
+  <span class="tok-fn">getItem</span>(key: <span class="tok-type">string</span>): <span class="tok-type">Promise</span>&lt;<span class="tok-type">string</span>&gt;;
+  <span class="tok-fn">setItem</span>(key: <span class="tok-type">string</span>, value: <span class="tok-type">string</span>): <span class="tok-type">Promise</span>&lt;<span class="tok-type">void</span>&gt;;
 }
 
-<span class="c">// Codegen reads this spec and generates the native interfaces</span>
-<span class="k">export default</span> TurboModuleRegistry.<span class="f">getEnforcing</span>&lt;<span class="t">Spec</span>&gt;(<span class="s">'NativeStorage'</span>);</code></pre>
-      </div>
-      <p>At build time, Codegen turns that spec into native interfaces and types:</p>
-      <figure class="diagram">
-        <div class="flow">
-          <div class="node js">TypeScript specification</div>
-          <div class="arrow"></div>
-          <div class="node new">Codegen<small>runs at build time</small></div>
-          <div class="arrow"></div>
-          <div class="node native">Native interfaces<small>C++ · Java/Kotlin · Objective-C</small></div>
-        </div>
-      </figure>
-      <p>This gives:</p>
-      <ul class="list">
-        <li><strong>Type safety</strong>: type mismatches are caught at build time, not as runtime crashes.</li>
-        <li><strong>Consistency</strong>: less hand-written, error-prone boilerplate on each platform.</li>
-        <li><strong>Predictable JS ↔ Native communication</strong>.</li>
-      </ul>
-    </section>
+<span class="tok-comment">// Codegen reads this spec and generates the native interfaces</span>
+<span class="tok-keyword">export default</span> TurboModuleRegistry.<span class="tok-fn">getEnforcing</span>&lt;<span class="tok-type">Spec</span>&gt;(<span class="tok-string">'NativeStorage'</span>);</code></pre>
+          </div>
 
-    <!-- 08 -->
-    <section id="big-picture">
-      <div class="sec-num">08</div>
-      <h2>Putting it all together</h2>
-      <p>This is the diagram worth memorizing:</p>
-      <figure class="diagram">
-        <div class="flow">
-          <div class="node js">React Application</div>
-          <div class="arrow"></div>
-          <div class="node js">JavaScript Engine<small>Hermes</small></div>
-          <div class="arrow"></div>
-          <div class="node new">JSI</div>
-          <div class="arrow" style="height:14px;margin-bottom:0"></div>
-          <div class="fork" style="max-width:220px"></div>
-          <div class="branch">
-            <div>
-              <div class="arrow" style="height:14px"></div>
-              <div class="node new">Fabric</div>
+          <p>
+            At build time, Codegen turns that spec into native interfaces and
+            types:
+          </p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">TypeScript specification</div>
               <div class="arrow"></div>
-              <div class="node">UI Rendering</div>
-            </div>
-            <div>
-              <div class="arrow" style="height:14px"></div>
-              <div class="node new">TurboModules</div>
+              <div class="node node--new">
+                Codegen<small>runs at build time</small>
+              </div>
               <div class="arrow"></div>
-              <div class="node">Native APIs</div>
+              <div class="node">
+                Native interfaces<small>C++ · Java/Kotlin · Objective-C</small>
+              </div>
             </div>
-          </div>
-          <div class="join" style="max-width:220px;margin-top:8px"></div>
-          <div class="arrow" style="height:18px"></div>
-          <div class="node native">Android / iOS</div>
-          <div style="height:22px"></div>
-          <div class="node dashed">Codegen → type-safe interfaces → Fabric &amp; TurboModules</div>
-        </div>
-      </figure>
+          </figure>
 
-      <h3>Old vs New at a glance</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Concern</th><th class="old">Old architecture</th><th class="new">New architecture</th></tr></thead>
-          <tbody>
-            <tr><td>JS ↔ Native</td><td>Bridge</td><td>JSI</td></tr>
-            <tr><td>Communication</td><td>Async only, serialized JSON</td><td>Direct calls, sync or async</td></tr>
-            <tr><td>Rendering</td><td>Legacy renderer via Bridge</td><td>Fabric</td></tr>
-            <tr><td>Native modules</td><td>Native Modules, loaded eagerly</td><td>TurboModules, loaded lazily</td></tr>
-            <tr><td>Type safety</td><td>Hand-written, unchecked</td><td>Codegen from typed specs</td></tr>
-          </tbody>
-        </table>
-      </div>
+          <p>This gives:</p>
+          <ul>
+            <li>
+              <strong>Type safety</strong>: type mismatches are caught at build
+              time, not as runtime crashes.
+            </li>
+            <li>
+              <strong>Consistency</strong>: less hand-written, error-prone
+              boilerplate on each platform.
+            </li>
+            <li><strong>Predictable JS ↔ Native communication</strong>.</li>
+          </ul>
+        </section>
 
-      <h3>One thing to memorize</h3>
-      <figure class="diagram">
-        <div class="split">
-          <div class="col">
-            <span class="col-label old">Old</span>
-            <div class="node js">JavaScript</div>
-            <div class="arrow"></div>
-            <div class="node old">Bridge</div>
-            <div class="arrow"></div>
-            <div class="node">Native Modules</div>
-            <div class="arrow"></div>
-            <div class="node native">Native UI</div>
-          </div>
-          <div class="col">
-            <span class="col-label new">New</span>
-            <div class="node js">JavaScript</div>
-            <div class="arrow"></div>
-            <div class="node new">JSI</div>
-            <div class="arrow" style="height:14px;margin-bottom:0"></div>
-            <div class="fork" style="width:60%"></div>
-            <div class="branch" style="gap:8px">
-              <div><div class="arrow" style="height:12px"></div><div class="node new" style="min-width:0;width:100%">Fabric</div><div class="arrow"></div><div class="node" style="min-width:0;width:100%">UI</div></div>
-              <div><div class="arrow" style="height:12px"></div><div class="node new" style="min-width:0;width:100%">TurboModules</div><div class="arrow"></div><div class="node" style="min-width:0;width:100%">Native APIs</div></div>
+        <!-- ============ 08 · BIG PICTURE ============ -->
+        <section class="section" id="big-picture">
+          <div class="section__num">08</div>
+          <h2>Putting it all together</h2>
+          <p>This is the diagram worth memorizing:</p>
+
+          <figure class="diagram">
+            <div class="flow">
+              <div class="node node--js">React Application</div>
+              <div class="arrow"></div>
+              <div class="node node--js">
+                JavaScript Engine<small>Hermes</small>
+              </div>
+              <div class="arrow"></div>
+              <div class="node node--new">JSI</div>
+
+              <div class="arrow arrow--stem"></div>
+              <div class="fork"></div>
+              <div class="branch">
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new">Fabric</div>
+                  <div class="arrow"></div>
+                  <div class="node">UI Rendering</div>
+                </div>
+                <div class="flow">
+                  <div class="arrow arrow--short"></div>
+                  <div class="node node--new">TurboModules</div>
+                  <div class="arrow"></div>
+                  <div class="node">Native APIs</div>
+                </div>
+              </div>
+              <div class="join"></div>
+              <div class="arrow arrow--short"></div>
+
+              <div class="node">Android / iOS</div>
+              <div class="node node--note">
+                Codegen → type-safe interfaces → Fabric &amp; TurboModules
+              </div>
             </div>
+          </figure>
+
+          <h3>Old vs New at a glance</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Concern</th>
+                  <th class="col-old">Old architecture</th>
+                  <th class="col-new">New architecture</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>JS ↔ Native</td>
+                  <td>Bridge</td>
+                  <td>JSI</td>
+                </tr>
+                <tr>
+                  <td>Communication</td>
+                  <td>Async only, serialized JSON</td>
+                  <td>Direct calls, sync or async</td>
+                </tr>
+                <tr>
+                  <td>Rendering</td>
+                  <td>Legacy renderer via Bridge</td>
+                  <td>Fabric</td>
+                </tr>
+                <tr>
+                  <td>Native modules</td>
+                  <td>Native Modules, loaded eagerly</td>
+                  <td>TurboModules, loaded lazily</td>
+                </tr>
+                <tr>
+                  <td>Type safety</td>
+                  <td>Hand-written, unchecked</td>
+                  <td>Codegen from typed specs</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
-      </figure>
-    </section>
 
-    <!-- 09 -->
-    <section id="performance">
-      <div class="sec-num">09</div>
-      <h2>Performance</h2>
+          <h3>One thing to memorize</h3>
+          <figure class="diagram">
+            <div class="compare">
+              <div class="flow">
+                <span class="flow__label flow__label--old">Old</span>
+                <div class="node node--js">JavaScript</div>
+                <div class="arrow"></div>
+                <div class="node node--old">Bridge</div>
+                <div class="arrow"></div>
+                <div class="node">Native Modules</div>
+                <div class="arrow"></div>
+                <div class="node">Native UI</div>
+              </div>
+              <div class="flow">
+                <span class="flow__label flow__label--new">New</span>
+                <div class="node node--js">JavaScript</div>
+                <div class="arrow"></div>
+                <div class="node node--new">JSI</div>
+                <div class="arrow arrow--stem"></div>
+                <div class="fork fork--wide"></div>
+                <div class="branch branch--tight">
+                  <div class="flow">
+                    <div class="arrow arrow--short"></div>
+                    <div class="node node--new node--fluid">Fabric</div>
+                    <div class="arrow"></div>
+                    <div class="node node--fluid">UI</div>
+                  </div>
+                  <div class="flow">
+                    <div class="arrow arrow--short"></div>
+                    <div class="node node--new node--fluid">TurboModules</div>
+                    <div class="arrow"></div>
+                    <div class="node node--fluid">Native APIs</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </figure>
+        </section>
 
-      <h3>Why can React Native apps become slow?</h3>
-      <p>Performance problems usually come from one of these:</p>
-      <ul class="list">
-        <li>too much work on the <strong>JavaScript thread</strong></li>
-        <li>excessive JS ↔ native interactions</li>
-        <li>unnecessary re-renders</li>
-        <li>large lists rendered inefficiently</li>
-        <li>expensive calculations during render</li>
-        <li>poorly optimized images</li>
-      </ul>
+        <!-- ============ 09 · PERFORMANCE ============ -->
+        <section class="section" id="performance">
+          <div class="section__num">09</div>
+          <h2>Performance</h2>
 
-      <h3>How do you optimize React Native?</h3>
-      <p>Know these three areas for interviews.</p>
+          <h3>Why can React Native apps become slow?</h3>
+          <p>Performance problems usually come from one of these:</p>
+          <ul>
+            <li>too much work on the <strong>JavaScript thread</strong></li>
+            <li>excessive JS ↔ native interactions</li>
+            <li>unnecessary re-renders</li>
+            <li>large lists rendered inefficiently</li>
+            <li>expensive calculations during render</li>
+            <li>poorly optimized images</li>
+          </ul>
 
-      <h3>1. React optimization</h3>
-      <ul class="list">
-        <li><code>React.memo</code>: skip re-rendering a component when its props haven't changed.</li>
-        <li><code>useMemo</code>: cache the result of an expensive calculation.</li>
-        <li><code>useCallback</code>: keep a function reference stable between renders.</li>
-        <li>Avoid unnecessary state and keep state as close to where it's used as possible.</li>
-        <li>Avoid unnecessary re-renders; profile with React DevTools.</li>
-      </ul>
+          <h3>How do you optimize React Native?</h3>
+          <p>Know these three areas for interviews.</p>
 
-      <h3>2. Lists</h3>
-      <p>Use <code>FlatList</code> (virtualized, renders only what's on screen) instead of <code>ScrollView</code> (renders everything at once) for large datasets.</p>
-      <div class="code">
-        <div class="code-head"><span>OptimizedList.tsx</span><button class="copy" type="button">Copy</button></div>
-<pre><code>&lt;<span class="t">FlatList</span>
+          <h3>1. React optimization</h3>
+          <ul>
+            <li>
+              <code>React.memo</code>: skip re-rendering a component when its
+              props haven't changed.
+            </li>
+            <li>
+              <code>useMemo</code>: cache the result of an expensive
+              calculation.
+            </li>
+            <li>
+              <code>useCallback</code>: keep a function reference stable between
+              renders.
+            </li>
+            <li>
+              Avoid unnecessary state and keep state as close to where it's used
+              as possible.
+            </li>
+            <li>Avoid unnecessary re-renders; profile with React DevTools.</li>
+          </ul>
+
+          <h3>2. Lists</h3>
+          <p>
+            Use <code>FlatList</code> (virtualized, renders only what's on
+            screen) instead of <code>ScrollView</code> (renders everything at
+            once) for large datasets.
+          </p>
+
+          <div class="code-block">
+            <div class="code-block__head">
+              <span>OptimizedList.tsx</span
+              ><button class="code-block__copy" type="button">Copy</button>
+            </div>
+            <pre><code>&lt;<span class="tok-type">FlatList</span>
   data={items}
-  renderItem={renderItem}                  <span class="c">// memoized with useCallback</span>
-  keyExtractor={(item) =&gt; item.id}         <span class="c">// stable, unique keys</span>
-  getItemLayout={(_, index) =&gt; ({          <span class="c">// skip measuring fixed-height rows</span>
-    length: <span class="t">ITEM_HEIGHT</span>,
-    offset: <span class="t">ITEM_HEIGHT</span> * index,
+  renderItem={renderItem}                  <span class="tok-comment">// memoized with useCallback</span>
+  <button class="explain-link" type="button" data-explain="keyExtractor">keyExtractor</button>={(item) =&gt; item.id.<span class="tok-fn">toString</span>()} <span class="tok-comment">// stable, unique keys</span>
+  <button class="explain-link" type="button" data-explain="getItemLayout">getItemLayout</button>={(_, index) =&gt; ({          <span class="tok-comment">// skip measuring fixed-height rows</span>
+    length: <span class="tok-type">ITEM_HEIGHT</span>,
+    offset: <span class="tok-type">ITEM_HEIGHT</span> * index,
     index,
   })}
-  initialNumToRender={<span class="t">10</span>}                  <span class="c">// items in the first render</span>
-  maxToRenderPerBatch={<span class="t">10</span>}                 <span class="c">// items rendered per batch</span>
-  windowSize={<span class="t">5</span>}                           <span class="c">// screens of content kept mounted</span>
+  <button class="explain-link" type="button" data-explain="initialNumToRender">initialNumToRender</button>={<span class="tok-type">10</span>}                  <span class="tok-comment">// items in the first render</span>
+  <button class="explain-link" type="button" data-explain="maxToRenderPerBatch">maxToRenderPerBatch</button>={<span class="tok-type">10</span>}                 <span class="tok-comment">// items rendered per batch</span>
+  <button class="explain-link" type="button" data-explain="windowSize">windowSize</button>={<span class="tok-type">5</span>}                           <span class="tok-comment">// screens of content kept mounted</span>
+/&gt;</code></pre>
+          </div>
+          <p class="explain-hint">Tip: click a highlighted prop to see a full explanation.</p>
+
+          <h3>The easiest way to remember all 5</h3>
+          <p>Think about a restaurant. You have <strong>10,000 customers</strong> but only need to serve the ones around you.</p>
+          <div class="memory-grid">
+            <button class="memory-card" type="button" data-explain="keyExtractor">
+              <code class="memory-card__prop">keyExtractor</code>
+              <span class="memory-card__question">"Who is this customer?"</span>
+              <span class="memory-card__answer">ID = 123 · unique identity</span>
+            </button>
+            <button class="memory-card" type="button" data-explain="getItemLayout">
+              <code class="memory-card__prop">getItemLayout</code>
+              <span class="memory-card__question">"Where is this customer sitting?"</span>
+              <span class="memory-card__answer">Customer #10 → 10 × rowHeight · position</span>
+            </button>
+            <button class="memory-card" type="button" data-explain="initialNumToRender">
+              <code class="memory-card__prop">initialNumToRender</code>
+              <span class="memory-card__question">"How many customers should I serve immediately?"</span>
+              <span class="memory-card__answer">10 customers · initial rendering</span>
+            </button>
+            <button class="memory-card" type="button" data-explain="maxToRenderPerBatch">
+              <code class="memory-card__prop">maxToRenderPerBatch</code>
+              <span class="memory-card__question">"How many more should I serve at a time?"</span>
+              <span class="memory-card__answer">10 per batch · batch rendering</span>
+            </button>
+            <button class="memory-card memory-card--wide" type="button" data-explain="windowSize">
+              <code class="memory-card__prop">windowSize</code>
+              <span class="memory-card__question">"How large an area around me should I keep ready?"</span>
+              <span class="memory-card__answer">5 screens' worth of content · rendering window</span>
+            </button>
+          </div>
+
+          <h3>Interview answer: "How would you optimize a FlatList?"</h3>
+          <blockquote class="answer">
+            <p>
+              "First, I would make sure every item has a stable
+              <strong>keyExtractor</strong>. If the item height is fixed, I'd use
+              <strong>getItemLayout</strong> so FlatList doesn't need to measure
+              every item. Then I'd tune <strong>initialNumToRender</strong>,
+              <strong>maxToRenderPerBatch</strong>, and <strong>windowSize</strong>
+              based on the item complexity and device performance. I would also
+              avoid unnecessary re-renders using <strong>React.memo</strong>, keep
+              <strong>renderItem</strong> stable where appropriate, and avoid
+              putting expensive calculations inside renderItem."
+            </p>
+          </blockquote>
+
+          <h3>3. Images</h3>
+          <ul>
+            <li>
+              Serve appropriately sized images, not full-resolution originals.
+            </li>
+            <li>Cache images.</li>
+            <li>Use compressed assets (e.g. WebP).</li>
+            <li>
+              Use an optimized image library (such as <code>expo-image</code>)
+              when needed.
+            </li>
+          </ul>
+        </section>
+
+        <!-- ============ 10 · INTERVIEW ANSWER ============ -->
+        <section class="section" id="interview">
+          <div class="section__num">10</div>
+          <h2>One-minute interview answer</h2>
+          <p>
+            If you're asked to <em>"explain React Native's architecture"</em>,
+            this covers everything in about a minute:
+          </p>
+
+          <blockquote class="answer">
+            <p>
+              React Native allows us to build native Android and iOS
+              applications using React and JavaScript or TypeScript. Our React
+              code runs in a JavaScript runtime, while the actual UI and
+              platform-specific functionality are handled by native Android and
+              iOS code.
+            </p>
+            <p>
+              Historically, React Native used a <strong>Bridge</strong> for
+              communication between JavaScript and native code. The Bridge
+              serialized messages and communicated asynchronously, which could
+              become a bottleneck for high-frequency communication.
+            </p>
+            <p>
+              The New Architecture addresses this with
+              <strong>JSI, Fabric, TurboModules and Codegen</strong>. JSI
+              provides a more direct interface between JavaScript and native or
+              C++ code. Fabric is the new rendering system, while TurboModules
+              are the newer native module system and support things such as lazy
+              loading. Codegen generates type-safe native interfaces from
+              specifications.
+            </p>
+            <p>
+              So, at a high level, React handles the application and component
+              logic, JSI provides the JavaScript-to-native interface, Fabric
+              handles rendering, TurboModules provide native functionality, and
+              Android or iOS ultimately renders and executes the native
+              functionality.
+            </p>
+          </blockquote>
+
+          <h3>Cheat sheet</h3>
+          <div class="cheat-sheet">
+            <div><b>JSI</b><span>the foundation</span></div>
+            <div><b>Fabric</b><span>rendering</span></div>
+            <div><b>TurboModules</b><span>native modules</span></div>
+            <div><b>Codegen</b><span>type safety</span></div>
+          </div>
+        </section>
+
+        <footer class="footer">
+          React Native Architecture: study notes for interview preparation.
+        </footer>
+      </main>
+    </div>
+
+    <!-- ============ EXPLAINER PANEL ============ -->
+    <!-- One shared dialog; js/explainer.js fills it from the templates below. -->
+    <dialog class="explainer" aria-labelledby="explainer-title">
+      <div class="explainer__head">
+        <div>
+          <div class="explainer__kicker"></div>
+          <h2 class="explainer__title" id="explainer-title"></h2>
+        </div>
+        <button class="explainer__close" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="explainer__body"></div>
+    </dialog>
+
+    <!-- ---------- Explainer: keyExtractor ---------- -->
+    <template id="explain-keyExtractor" data-title="keyExtractor" data-kicker="FlatList prop">
+      <h3>What does it do?</h3>
+      <p>It tells React Native how to <strong>uniquely identify each item</strong> in the list.</p>
+
+      <div class="code-block">
+        <div class="code-block__head">
+          <span>EmployeeList.tsx</span
+          ><button class="code-block__copy" type="button">Copy</button>
+        </div>
+        <pre><code>&lt;<span class="tok-type">FlatList</span>
+  data={employees}
+  keyExtractor={(item) =&gt; item.id.<span class="tok-fn">toString</span>()}
 /&gt;</code></pre>
       </div>
 
-      <h3>3. Images</h3>
-      <ul class="list">
-        <li>Serve appropriately sized images, not full-resolution originals.</li>
-        <li>Cache images.</li>
-        <li>Use compressed assets (e.g. WebP).</li>
-        <li>Use an optimized image library (such as <code>expo-image</code>) when needed.</li>
-      </ul>
-    </section>
-
-    <!-- 10 -->
-    <section id="interview">
-      <div class="sec-num">10</div>
-      <h2>One-minute interview answer</h2>
-      <p>If you're asked to <em>"explain React Native's architecture"</em>, this covers everything in about a minute:</p>
-      <blockquote class="answer">
-        <p>React Native allows us to build native Android and iOS applications using React and JavaScript or TypeScript. Our React code runs in a JavaScript runtime, while the actual UI and platform-specific functionality are handled by native Android and iOS code.</p>
-        <p>Historically, React Native used a <strong>Bridge</strong> for communication between JavaScript and native code. The Bridge serialized messages and communicated asynchronously, which could become a bottleneck for high-frequency communication.</p>
-        <p>The New Architecture addresses this with <strong>JSI, Fabric, TurboModules and Codegen</strong>. JSI provides a more direct interface between JavaScript and native or C++ code. Fabric is the new rendering system, while TurboModules are the newer native module system and support things such as lazy loading. Codegen generates type-safe native interfaces from specifications.</p>
-        <p>So, at a high level, React handles the application and component logic, JSI provides the JavaScript-to-native interface, Fabric handles rendering, TurboModules provide native functionality, and Android or iOS ultimately renders and executes the native functionality.</p>
-      </blockquote>
-
-      <h3>Cheat sheet</h3>
-      <div class="cheat">
-        <div><b>JSI</b><span>the foundation</span></div>
-        <div><b>Fabric</b><span>rendering</span></div>
-        <div><b>TurboModules</b><span>native modules</span></div>
-        <div><b>Codegen</b><span>type safety</span></div>
+      <p>If your data is:</p>
+      <div class="code-block">
+        <div class="code-block__head">
+          <span>employees</span
+          ><button class="code-block__copy" type="button">Copy</button>
+        </div>
+        <pre><code>[
+  { id: <span class="tok-type">101</span>, name: <span class="tok-string">"John"</span> },
+  { id: <span class="tok-type">102</span>, name: <span class="tok-string">"David"</span> },
+  { id: <span class="tok-type">103</span>, name: <span class="tok-string">"Alex"</span> },
+]</code></pre>
       </div>
-    </section>
 
-    <footer>React Native Architecture: study notes for interview preparation.</footer>
-  </main>
-</div>
+      <p>Then each item gets these keys:</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Item</th><th>Key</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>John</td><td><code>"101"</code></td></tr>
+            <tr><td>David</td><td><code>"102"</code></td></tr>
+            <tr><td>Alex</td><td><code>"103"</code></td></tr>
+          </tbody>
+        </table>
+      </div>
 
-<script>
-(function () {
-  // Theme toggle
-  var root = document.documentElement;
-  try { var saved = localStorage.getItem('rn-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
-  document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var current = root.getAttribute('data-theme') ||
-        (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      var next = current === 'dark' ? 'light' : 'dark';
-      root.setAttribute('data-theme', next);
-      try { localStorage.setItem('rn-theme', next); } catch (e) {}
-    });
-  });
+      <h3>Why is it important?</h3>
+      <p>React needs a <strong>stable key</strong> to know: <em>"This is the same item as before."</em></p>
+      <p>Without stable keys, React may unnecessarily recreate or re-render list items.</p>
 
-  // Copy buttons
-  document.querySelectorAll('.code').forEach(function (block) {
-    var btn = block.querySelector('.copy');
-    var code = block.querySelector('pre');
-    if (!btn || !code) return;
-    btn.addEventListener('click', function () {
-      if (!navigator.clipboard) return;
-      navigator.clipboard.writeText(code.innerText).then(function () {
-        btn.textContent = 'Copied';
-        setTimeout(function () { btn.textContent = 'Copy'; }, 1500);
-      });
-    });
-  });
+      <div class="callout callout--warn">
+        <div class="callout__icon">❌</div>
+        <div>
+          <p class="callout__title">Avoid</p>
+          <p><code>keyExtractor={(item, index) =&gt; index.toString()}</code></p>
+          <p>when your data has a real unique ID.</p>
+        </div>
+      </div>
 
-  // Highlight the current section in the sidebar
-  var links = document.querySelectorAll('#toc a');
-  var map = {};
-  links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
-  if ('IntersectionObserver' in window) {
-    var obs = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) {
-          links.forEach(function (a) { a.classList.remove('active'); });
-          var a = map[e.target.id];
-          if (a) a.classList.add('active');
-        }
-      });
-    }, { rootMargin: '-20% 0px -70% 0px' });
-    document.querySelectorAll('main section').forEach(function (s) { obs.observe(s); });
-  }
+      <div class="callout callout--good">
+        <div class="callout__icon">✅</div>
+        <div>
+          <p class="callout__title">Prefer</p>
+          <p><code>keyExtractor={(item) =&gt; item.id.toString()}</code></p>
+        </div>
+      </div>
 
-  // Close mobile contents after choosing a section
-  document.querySelectorAll('.mobile-toc a').forEach(function (a) {
-    a.addEventListener('click', function () { a.closest('details').open = false; });
-  });
-})();
-</script>
-</body>
+      <h3>Interview answer</h3>
+      <blockquote class="answer">
+        <p>"keyExtractor provides a unique and stable key for each FlatList item, allowing React to efficiently track which items were added, removed, or updated."</p>
+      </blockquote>
+    </template>
+
+    <!-- ---------- Explainer: getItemLayout ---------- -->
+    <template id="explain-getItemLayout" data-title="getItemLayout" data-kicker="FlatList prop">
+      <div class="callout callout--tip">
+        <div class="callout__icon">⚡</div>
+        <div><p>This one is <strong>very important for performance</strong>.</p></div>
+      </div>
+
+      <h3>What does it do?</h3>
+      <p>Normally FlatList has to <strong>measure items</strong> to understand their positions. Suppose every row is exactly <strong>60px</strong>. You can tell FlatList directly:</p>
+
+      <div class="code-block">
+        <div class="code-block__head">
+          <span>getItemLayout</span
+          ><button class="code-block__copy" type="button">Copy</button>
+        </div>
+        <pre><code>getItemLayout={(data, index) =&gt; ({
+  length: <span class="tok-type">60</span>,
+  offset: <span class="tok-type">60</span> * index,
+  index,
+})}</code></pre>
+      </div>
+
+      <p>So each item's position is simply calculated:</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Item</th><th>Calculation</th><th>Offset</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Item 0</td><td>60 × 0</td><td>0px</td></tr>
+            <tr><td>Item 1</td><td>60 × 1</td><td>60px</td></tr>
+            <tr><td>Item 2</td><td>60 × 2</td><td>120px</td></tr>
+            <tr><td>Item 3</td><td>60 × 3</td><td>180px</td></tr>
+            <tr><td>…</td><td>…</td><td>…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>FlatList <strong>doesn't need to measure every item</strong>.</p>
+
+      <h3>Best use case</h3>
+      <p>When <strong>all items have a fixed height</strong>. For example:</p>
+      <div class="code-block">
+        <div class="code-block__head">
+          <span>EmployeeList.tsx</span
+          ><button class="code-block__copy" type="button">Copy</button>
+        </div>
+        <pre><code><span class="tok-keyword">const</span> <span class="tok-type">ITEM_HEIGHT</span> = <span class="tok-type">60</span>;
+
+&lt;<span class="tok-type">FlatList</span>
+  data={employees}
+  getItemLayout={(data, index) =&gt; ({
+    length: <span class="tok-type">ITEM_HEIGHT</span>,
+    offset: <span class="tok-type">ITEM_HEIGHT</span> * index,
+    index,
+  })}
+/&gt;</code></pre>
+      </div>
+
+      <h3>Why useful?</h3>
+      <p>It improves:</p>
+      <ul>
+        <li>scrolling performance</li>
+        <li><code>scrollToIndex</code> (jumps straight to the item without measuring the ones before it)</li>
+        <li>large lists</li>
+        <li>rendering efficiency</li>
+      </ul>
+
+      <div class="callout callout--warn">
+        <div class="callout__icon">❌</div>
+        <div>
+          <p class="callout__title">Don't use blindly</p>
+          <p>If your rows have <strong>dynamic heights</strong>, a fixed <code>getItemLayout</code> would be incorrect:</p>
+        </div>
+      </div>
+      <figure class="diagram">
+        <div class="flow">
+          <div class="node">John<small>Short row</small></div>
+          <div class="arrow arrow--short"></div>
+          <div class="node node--screen">David<small>Very long description<br>spanning multiple lines<br>so this row is much taller</small></div>
+        </div>
+        <figcaption class="diagram__caption">Rows of different heights: <code>60 × index</code> would put items in the wrong place.</figcaption>
+      </figure>
+
+      <h3>Interview answer</h3>
+      <blockquote class="answer">
+        <p>"getItemLayout allows FlatList to calculate an item's size and position without measuring it. It's particularly useful for large lists with fixed-height items and improves operations such as scrolling to a specific index."</p>
+      </blockquote>
+    </template>
+
+    <!-- ---------- Explainer: initialNumToRender ---------- -->
+    <template id="explain-initialNumToRender" data-title="initialNumToRender" data-kicker="FlatList prop">
+      <h3>What does it do?</h3>
+      <p>It controls: <em>"How many items should FlatList render initially?"</em></p>
+
+      <div class="code-block">
+        <div class="code-block__head">
+          <span>Example</span
+          ><button class="code-block__copy" type="button">Copy</button>
+        </div>
+        <pre><code>initialNumToRender={<span class="tok-type">10</span>}</code></pre>
+      </div>
+
+      <p>If you have <strong>10,000 items</strong>, FlatList doesn't render all 10,000 immediately. Instead:</p>
+      <figure class="diagram">
+        <div class="flow">
+          <span class="flow__label flow__label--new">Initial render</span>
+          <div class="node-row">
+            <div class="node node--new node--item">1</div>
+            <div class="node node--new node--item">2</div>
+            <div class="node node--new node--item">3</div>
+            <div class="node node--new node--item">…</div>
+            <div class="node node--new node--item">10</div>
+          </div>
+          <div class="arrow"></div>
+          <div class="node node--ghost">More items render as you scroll</div>
+        </div>
+      </figure>
+
+      <h3>Why?</h3>
+      <p>If you do <code>initialNumToRender={1000}</code>, you're asking it to render 1,000 items immediately. That can cause:</p>
+      <figure class="diagram">
+        <div class="flow">
+          <div class="node">App opens</div>
+          <div class="arrow"></div>
+          <div class="node node--old">1,000 components render</div>
+          <div class="arrow"></div>
+          <div class="node node--old">Heavy JS work</div>
+          <div class="arrow"></div>
+          <div class="node node--old">Slow initial screen</div>
+        </div>
+      </figure>
+      <p>Whereas <code>initialNumToRender={10}</code> can make initial rendering faster.</p>
+
+      <div class="callout callout--warn">
+        <div class="callout__icon">⚠️</div>
+        <div>
+          <p class="callout__title">But don't blindly use a tiny number</p>
+          <p>If your screen can display 15 items, rendering only 2 isn't useful: the first screen would look empty. Cover at least one full screen.</p>
+        </div>
+      </div>
+
+      <p>A good value depends on:</p>
+      <ul>
+        <li>item height</li>
+        <li>screen size</li>
+        <li>complexity of each item</li>
+        <li>device performance</li>
+      </ul>
+
+      <h3>Interview answer</h3>
+      <blockquote class="answer">
+        <p>"initialNumToRender controls how many items FlatList renders during the initial render. Keeping it appropriate helps reduce the initial rendering cost."</p>
+      </blockquote>
+    </template>
+
+    <!-- ---------- Explainer: maxToRenderPerBatch ---------- -->
+    <template id="explain-maxToRenderPerBatch" data-title="maxToRenderPerBatch" data-kicker="FlatList prop">
+      <h3>What does it do?</h3>
+      <p>It controls: <em>"How many additional items does FlatList render in each batch while scrolling?"</em></p>
+
+      <div class="code-block">
+        <div class="code-block__head">
+          <span>Example</span
+          ><button class="code-block__copy" type="button">Copy</button>
+        </div>
+        <pre><code>maxToRenderPerBatch={<span class="tok-type">10</span>}</code></pre>
+      </div>
+
+      <figure class="diagram">
+        <div class="flow">
+          <div class="node node--js">Initial: 10 items</div>
+          <div class="arrow"></div>
+          <div class="arrow__label">user scrolls</div>
+          <div class="node node--new">Batch 1 → next 10 items</div>
+          <div class="arrow"></div>
+          <div class="arrow__label">scroll again</div>
+          <div class="node node--new">Batch 2 → next 10 items</div>
+          <div class="arrow"></div>
+          <div class="node node--new">Batch 3 → next 10 items</div>
+        </div>
+      </figure>
+
+      <h3>Finding the balance</h3>
+      <figure class="diagram">
+      <div class="compare">
+        <div class="flow">
+          <span class="flow__label flow__label--old">Too high: 50</span>
+          <div class="node">User scrolls</div>
+          <div class="arrow"></div>
+          <div class="node node--old">50 components rendered</div>
+          <div class="arrow"></div>
+          <div class="node node--old">More JS work</div>
+          <div class="arrow"></div>
+          <div class="node node--old">Potential frame drops</div>
+        </div>
+        <div class="flow">
+          <span class="flow__label flow__label--old">Too low: 2</span>
+          <div class="node">User scrolls very fast</div>
+          <div class="arrow"></div>
+          <div class="node node--old">Not enough items rendered</div>
+          <div class="arrow"></div>
+          <div class="node node--old">Blank / white areas appear temporarily</div>
+        </div>
+      </div>
+      </figure>
+      <p>So you need a <strong>balance</strong>.</p>
+
+      <h3>Interview answer</h3>
+      <blockquote class="answer">
+        <p>"maxToRenderPerBatch controls how many new list items FlatList renders in each rendering batch. Increasing it can reduce blank areas during fast scrolling but increases rendering work per batch."</p>
+      </blockquote>
+    </template>
+
+    <!-- ---------- Explainer: windowSize ---------- -->
+    <template id="explain-windowSize" data-title="windowSize" data-kicker="FlatList prop">
+      <div class="callout callout--tip">
+        <div class="callout__icon">💡</div>
+        <div><p>This one is <strong>commonly misunderstood</strong>.</p></div>
+      </div>
+
+      <h3>What does it do?</h3>
+      <p>It controls <strong>how much content FlatList keeps rendered around the visible area</strong>. The default is <code>windowSize = 21</code>, and the unit is roughly <strong>viewport heights</strong> (one full screen of content).</p>
+      <p>With <code>windowSize={5}</code>, FlatList keeps a window of about 5 screens mounted: the visible screen plus about 2 screens above and 2 below.</p>
+
+      <figure class="diagram">
+        <div class="flow">
+          <div class="node node--ghost node--screen">Previous content<small>≈ 2 screens, kept mounted</small></div>
+          <div class="arrow arrow--short"></div>
+          <div class="node node--js node--screen">Visible area<small>what the user sees: 1 viewport</small></div>
+          <div class="arrow arrow--short"></div>
+          <div class="node node--ghost node--screen">Next content<small>≈ 2 screens, kept mounted</small></div>
+        </div>
+        <figcaption class="diagram__caption">Anything outside the window is unmounted to save memory.</figcaption>
+      </figure>
+
+      <p>A larger window like <code>windowSize={21}</code> means more items remain rendered around the visible area.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th></th><th class="col-new">Pros</th><th class="col-old">Cons</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Larger windowSize</td><td>Smoother fast scrolling, less chance of blank areas</td><td>More memory, more components mounted</td></tr>
+            <tr><td>Smaller windowSize</td><td>Lower memory usage</td><td>More blank areas possible during very fast scrolling</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Interview answer</h3>
+      <blockquote class="answer">
+        <p>"windowSize controls how many screens' worth of content FlatList keeps rendered around the visible area. A larger window gives smoother fast scrolling at the cost of memory; a smaller window saves memory but can show blank areas when scrolling quickly."</p>
+      </blockquote>
+    </template>
+  </body>
 </html>

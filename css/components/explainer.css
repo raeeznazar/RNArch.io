@@ -1,0 +1,115 @@
+/*
+ * Explainer component
+ * -------------------
+ * Clickable terms (usually inside code) that open a detail panel.
+ *
+ *   <button class="explain-link" data-explain="keyExtractor">keyExtractor</button>
+ *   <template id="explain-keyExtractor"> ...panel content... </template>
+ *
+ * js/explainer.js copies the template into the shared <dialog class="explainer">.
+ */
+
+/* ---------- Clickable term ---------- */
+
+.explain-link {
+  padding: 0 2px;
+  margin: 0 -2px;
+  font: inherit;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 0;
+  border-bottom: 1.5px dashed var(--accent);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.explain-link:hover,
+.explain-link:focus-visible {
+  color: var(--bg);
+  background: var(--accent);
+  outline: none;
+}
+
+.explain-hint {
+  margin: -14px 0 24px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ---------- Dialog panel ---------- */
+
+.explainer {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .25);
+}
+
+.explainer::backdrop {
+  background: rgba(15, 17, 21, .55);
+  backdrop-filter: blur(2px);
+}
+
+.explainer[open] { animation: explainer-in .18s ease-out; }
+
+@keyframes explainer-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.explainer__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 22px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.explainer__kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.explainer__title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
+  letter-spacing: 0;
+}
+
+.explainer__close {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.explainer__close:hover { color: var(--text); }
+
+.explainer__body { padding: 6px 22px 22px; }
+
+.explainer__body h3 { margin-top: 26px; }
+
+@media (max-width: 600px) {
+  .explainer__head { padding: 14px 16px; }
+  .explainer__body { padding: 4px 16px 18px; }
+}
+
+/* Long inline code (e.g. in the Avoid/Prefer callouts) may wrap inside the panel */
+.explainer :not(pre) > code { white-space: normal; word-break: break-word; }

@@ -1,0 +1,73 @@
+/*
+ * Base styles
+ * -----------
+ * Resets and default typography for plain HTML elements.
+ */
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 24px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3 { letter-spacing: -.02em; }
+
+h2 {
+  font-size: 1.85rem;
+  line-height: 1.25;
+  font-weight: 700;
+  margin: 6px 0 16px;
+}
+
+h3 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  letter-spacing: -.01em;
+  font-weight: 650;
+  margin: 36px 0 10px;
+}
+
+p { margin: 0 0 16px; }
+strong { font-weight: 650; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+ul {
+  margin: 0 0 18px;
+  padding-left: 1.25em;
+}
+li { margin: 4px 0; padding-left: 4px; }
+li::marker { color: var(--accent); }
+
+/* Ligatures off so `=>` and `!==` show exactly as typed */
+code, pre { font-family: var(--font-mono); font-variant-ligatures: none; }
+
+/* Inline code, e.g. `useMemo` in a sentence */
+:not(pre) > code {
+  font-size: .86em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+figure { margin: 0; }
+
+@media (max-width: 600px) {
+  body { font-size: 16.5px; }
+  h2 { font-size: 1.55rem; }
+}

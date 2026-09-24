@@ -1,0 +1,38 @@
+/*
+ * Callout component
+ * -----------------
+ * A highlighted note. Variants: .callout--tip, .callout--warn, .callout--good
+ *
+ * <div class="callout callout--tip">
+ *   <div class="callout__icon">💡</div>
+ *   <div><p class="callout__title">Title</p><p>Body</p></div>
+ * </div>
+ */
+
+.callout {
+  display: flex;
+  gap: 14px;
+  margin: 22px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.callout__icon {
+  flex: none;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.callout__title {
+  margin-bottom: 4px;
+  font-weight: 650;
+}
+
+.callout p:last-child { margin-bottom: 0; }
+
+.callout--tip  { background: var(--accent-soft); border-color: transparent; }
+.callout--warn { background: var(--warn-soft);   border-color: transparent; }
+.callout--good { background: var(--new-soft);    border-color: transparent; }
