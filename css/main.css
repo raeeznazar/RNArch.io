@@ -3,37 +3,40 @@
  * ----------------------
  * index.html loads only this file. Order matters:
  * tokens → base → layout → components.
+ *
+ * The ?v= numbers bust browser / GitHub Pages caches. When you change any
+ * CSS or JS, bump the number here and in every page's <link>/<script> tags.
  */
 
-@import url("tokens.css");
-@import url("base.css");
-@import url("layout.css");
+@import url("tokens.css?v=2");
+@import url("base.css?v=2");
+@import url("layout.css?v=2");
 
-@import url("components/sidebar.css");
-@import url("components/diagram.css");
-@import url("components/code-block.css");
-@import url("components/callout.css");
-@import url("components/cards.css");
-@import url("components/table.css");
-@import url("components/answer.css");
-@import url("components/explainer.css");
+@import url("components/sidebar.css?v=2");
+@import url("components/diagram.css?v=2");
+@import url("components/code-block.css?v=2");
+@import url("components/callout.css?v=2");
+@import url("components/cards.css?v=2");
+@import url("components/table.css?v=2");
+@import url("components/answer.css?v=2");
+@import url("components/explainer.css?v=2");
 
 /* Used by execution-context.html */
-@import url("components/button.css");
-@import url("components/visualizer.css");
-@import url("components/practice.css");
+@import url("components/button.css?v=2");
+@import url("components/visualizer.css?v=2");
+@import url("components/practice.css?v=2");
 
 /* Used by closures.html */
-@import url("components/playground.css");
+@import url("components/playground.css?v=2");
 
 /* Used by threads.html */
-@import url("components/event-loop.css");
+@import url("components/event-loop.css?v=2");
 
 /* Used by ssl-security.html */
-@import url("components/security.css");
+@import url("components/security.css?v=2");
 
 /* Used by token-refresh.html */
-@import url("components/token-refresh.css");
+@import url("components/token-refresh.css?v=2");
 
 @media print {
   .sidebar { display: none; }

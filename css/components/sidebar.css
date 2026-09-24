@@ -12,7 +12,10 @@
   top: 0;
   height: 100vh;
   overflow-y: auto;
-  padding: 40px 0 32px;
+  padding: 40px 14px 32px 0;
+  /* Thin, theme-coloured scrollbar instead of the chunky native one */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
 .sidebar__brand {
@@ -176,6 +179,7 @@
   .sidebar {
     position: static;
     height: auto;
+    overflow-y: visible;
     margin-top: 16px;
     padding: 12px 16px;
     border: 1px solid var(--border);
